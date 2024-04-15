@@ -1,2 +1,0 @@
-from simpleMod import Scenario
-
