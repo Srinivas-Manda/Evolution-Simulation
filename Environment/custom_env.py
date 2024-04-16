@@ -309,8 +309,6 @@ class CustomEnvironment(ParallelEnv):
         return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
 
     # Action space should be defined here.
-    # If your spaces change over time, remove this line (disable caching).
-    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return Discrete(360)
     
