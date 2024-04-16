@@ -8,20 +8,21 @@ from gymnasium.spaces import Discrete, MultiDiscrete, Box
 from pettingzoo import ParallelEnv
 
 class Entity:
-    def __init__(self) -> None:
+    def __init__(self, type = None) -> None:
         self.pos_x = None
         self.pos_y = None
+        self.type = type
 
     def update_pos(self, x, y):
         self.pos_x = x
         self.pos_y = y
 class Pellet(Entity):
     def __init__(self, id) -> None:
-        super().__init__()
+        super().__init__("Pellet")
         self.pellet_id = id
 class Agent(Entity):
     def __init__(self, name, id) -> None:
-        super().__init__()
+        super().__init__("Agent")
         self.strength = None
         self.vision_size = None
         self.movement_speed = None
@@ -64,12 +65,9 @@ class CustomEnvironment(ParallelEnv):
         self.num_pellets = env_config.num_pellets
 
         self.agent_positions = [[]]
-        self.pellets_positions = []
-        self.agent_vision = 5
+        self.pellets_positions = [[]]
         self.max_agent_vision = None
-        self.agent_speed = 1
-        self.agent_stamina = []
-        self.grid_size_x = 100
+        self.grid_size_x = env_config.grid
         self.grid_size_y = 100
         self.timestep = None
 
@@ -84,6 +82,49 @@ class CustomEnvironment(ParallelEnv):
         # self.timestep = None
         # self.possible_agents = ["prisoner", "guard"]
 
+    # top is 0, right is 1, bottom is 2, left is 3. clockwise
+    def init_pos(self):
+        edge = np.random.randint(low = 0, high = 4, size = len(self.agents))
+        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
+        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False)
+        for i,agent in enumerate(self.agents):
+            if(edge[i]==0 or edge[i] ==2):
+                pos_x = pos_x[i]
+                pos_y = self.grid_size_y-1 if edge[i]==2 else 0
+                
+            elif(edge[i]==1 or edge[i] ==3):
+                pos_y = pos_y[i]
+                pos_x = self.grid_size_x-1 if edge[i]==1 else 0
+            
+            agent.update_pos(pos_x,pos_y)
+
+        points = set()
+        while len(points) < 10*self.num_pellets: # k means++ will handle this later
+            point_x = np.random.rand(1) * self.grid_size_x
+            point_y = np.random.rand(1) * self.grid_size_y
+            points.add((point_x[0],point_y[0]))
+        
+        points = [list(point) for point in points]
+        points = np.array(points)
+        
+        init_pellet = np.random.choice(range(len(points)))
+
+        temp_pellets = np.zeros((self.num_pellets, 2))
+        temp_pellets[0] = points[init_pellet]
+        
+        for i in range(1, self.num_pellets):
+            distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
+            probs = distances ** 2
+            probs /= probs.sum(axis=0)
+            temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
+
+        for i, pellet in enumerate(self.pellets):
+            pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
+
+        
+            
+
+    
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
