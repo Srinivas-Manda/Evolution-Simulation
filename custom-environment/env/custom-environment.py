@@ -6,12 +6,14 @@ import numpy as np
 from gymnasium.spaces import Discrete, MultiDiscrete, Dict, MultiBinary
 from pettingzoo import ParallelEnv
 from pettingzoo.utils import agent_selector
-from pettingzoo.magents import wrappers
+# from pettingzoo.magents import wrappers
+from pettingzoo.test import parallel_api_test
 
 
 class CustomEnvironment(ParallelEnv):
     metadata = {
         "name": "evolution_v0",
+        "render_modes" : "human"
     }
 
     def __init__(self, num_agents = 4, num_food = 3):
@@ -26,6 +28,8 @@ class CustomEnvironment(ParallelEnv):
         # randomize food spawn, decide on the number of foods to spawned after each day and use random.randit(x,y)
         self.num_food =  num_food
         self.food_spawn = None
+        self.pickup = None
+        self.stamina = None
         self.action_space = Discrete(5) # UDLRC
         self.observation_space = Dict({
             "agent_pos": MultiBinary(self.grid_size**2),
@@ -38,7 +42,13 @@ class CustomEnvironment(ParallelEnv):
         self.dones = {agent_id: False for agent_id in range(self.num_agents)}
         self.reset()
 
+
+    # Resets the environment to an initial state, 
+    # required before calling step. 
+    # Returns the first agent observation for an episode and information, i.e. metrics, debug info.
     def reset(self, seed=None, options=None):
+        if(seed):
+            super().reset(seed=seed)
         self.grid = np.zeros((self.grid_size,self.grid_size))
         self.place_food()
 
@@ -64,7 +74,7 @@ class CustomEnvironment(ParallelEnv):
     def place_food(self):
         num_food_placed = 0
         while num_food_placed < self.num_food:
-            x, y = np.random.randint(0, self.grid_size, size=2)
+            x, y = np.random.randint(0, self.grid_size, size=2) # make sure only middle
             if self.grid[x, y] == 0:
                 self.grid[x, y] = 1 # 1 signifies that food is placed
                 num_food_placed += 1
@@ -76,6 +86,10 @@ class CustomEnvironment(ParallelEnv):
         ]
         self.agent_states[agent_id]["local_food"] = local_grid.flatten()
 
+    # Updates an environment with actions returning the next agent observation, 
+    # the reward for taking that actions, 
+    # if the environment has terminated or truncated due to the latest action and information from the environment about the step, i.e. metrics, debug info.
+    # gymnasium.Env.step(self, action: ActType) → tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]
     def step(self, action_n):
         # Discrete(5) is ordered as up, down, left, right, collect food
         agent_actions = {}
@@ -83,13 +97,45 @@ class CustomEnvironment(ParallelEnv):
                 agent_observation = self.observe(agent_id)
                 agent_actions[agent_id] = self.agent_algos[agent_id].act(agent_observation)
 
+        for agent_id in range(self.num_agents):
+            if self.dones[agent_id]:
+                continue
 
+            agent_action = agent_actions[agent_id]
+            current_pos = (self.agent_states[agent_id]["agent_pos"] == 2).nonzero()
+
+            # write logic for handling invalid actions, movement, gathering, and energy
+
+            # Check for agent death due to energy depletion
+            if self.agent_states[agent_id]["energy"] <= 0:
+                self.dones[agent_id] = True
+                self.infos[agent_id]["reason"] = "die"
+
+            # Implement sex logic - Discontinued
+
+            # Provide the RL algorithm with reward and next observation
+            next_observation = self.observe(agent_id)
+            self.agent_algos[agent_id].step(agent_observation, self.rewards[agent_id], self.dones[agent_id], next_observation)
+
+            # return self._step(action_n) 
 
     def render(self):
         pass
-
+    # The Space object corresponding to valid observations, 
+    # all valid observations should be contained within the space.
     def observation_space(self, agent):
         return MultiDiscrete([self.grid_x*self.grid_y])
 
+    #The Space object corresponding to valid actions, 
+    #all valid actions should be contained within the space.
     def action_space(self, agent):
         return Discrete(5) #up, down ,left ,right, collect food
+    
+    def close(self):
+        #close pygame and clear data here
+        pass
+
+if __name__ == "__main__":
+    print("Raghuram Learning : RL")
+    env = CustomEnvironment()
+    parallel_api_test(env, num_cycles=1_000_000)
