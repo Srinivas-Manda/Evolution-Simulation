@@ -3,22 +3,42 @@ import random
 from copy import copy
 
 import numpy as np
-from gymnasium.spaces import Discrete, MultiDiscrete
+from gymnasium.spaces import Discrete, MultiDiscrete, Box
 
 from pettingzoo import ParallelEnv
 
+class Entity:
+    def __init__(self) -> None:
+        self.pos_x = None
+        self.pos_y = None
+
+    def update_pos(self, x, y):
+        self.pos_x = x
+        self.pos_y = y
+class Pellet(Entity):
+    def __init__(self, id) -> None:
+        super().__init__()
+        self.pellet_id = id
+class Agent(Entity):
+    def __init__(self, name, id) -> None:
+        super().__init__()
+        self.strength = None
+        self.vision_size = None
+        self.movement_speed = None
+        self.agent_id = id
+        self.name = name
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
 
     The "name" metadata allows the environment to be pretty printed.
-    """
+    """ 
 
     metadata = {
         "name": "custom_environment_v0",
     }
 
-    def __init__(self):
+    def __init__(self, env_config):
         """The init method takes in environment arguments.
 
         Should define the following attributes:
@@ -39,19 +59,22 @@ class CustomEnvironment(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
-        self.possible_agents = ["a1", "a2", "a3"]
-        self.pellets = ["p1", "p2"]
-        self.agent_start_positions = []
-        self.agent_positions = []
+        self.agents = [Agent(agent_name,id) for id,agent_name in enumerate(env_config.agents)] #agent object list
+        self.pellets = [Pellet(id) for id in range(env_config.num_pellets)]
+        self.num_pellets = env_config.num_pellets
+
+        self.agent_positions = [[]]
         self.pellets_positions = []
         self.agent_vision = 5
+        self.max_agent_vision = None
         self.agent_speed = 1
         self.agent_stamina = []
-        self.fieldX = 100
-        self.fieldY = 100
+        self.grid_size_x = 100
+        self.grid_size_y = 100
         self.timestep = None
 
-    #old defs here
+        
+        #old defs here
         # self.escape_y = None
         # self.escape_x = None
         # self.guard_y = None
@@ -61,7 +84,7 @@ class CustomEnvironment(ParallelEnv):
         # self.timestep = None
         # self.possible_agents = ["prisoner", "guard"]
 
-    def reset(self, seed=None, options=None):
+    def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
         It needs to initialize the following attributes:
@@ -240,15 +263,13 @@ class CustomEnvironment(ParallelEnv):
         print(f"{grid} \n")
 
     # Observation space should be defined here.
-    # lru_cache allows observation and action spaces to be memoized, reducing clock cycles required to get each agent's space.
-    # If your spaces change over time, remove this line (disable caching).
-    @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
         # gymnasium spaces are defined and documented here: https://gymnasium.farama.org/api/spaces/
-        return MultiDiscrete([7 * 7 - 1] * 3)
+        return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
 
     # Action space should be defined here.
     # If your spaces change over time, remove this line (disable caching).
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        return Discrete(4)
+        return Discrete(360)
+    

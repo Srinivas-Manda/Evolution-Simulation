@@ -16,21 +16,21 @@ class CustomEnvironment(ParallelEnv):
         "render_modes" : "human"
     }
 
-    def __init__(self, num_agents = 4, num_food = 3):
+    def __init__(self, env_config):
         self.start_x = [] # contains the start x co-ordinates of all of the agents
         self.start_y = [] # contains the start y co-ordinates of all of the agents
         self.agent_pos = None # 2d list of x,y co-ordinates
-        self.num_agents = num_agents
+        self.num_agents = env_config.num_agents
         self.agent_algos = {agent_id: None for agent_id in range(self.num_agents)}
         self.grid_size = None # grid_size * grid_size sized grid
         self.speed = None # an agent can overpower a weaker agent if caught for food
         self.strength = None # an agent can run faster or slower 
         # randomize food spawn, decide on the number of foods to spawned after each day and use random.randit(x,y)
-        self.num_food =  num_food
+        self.num_food =  env_config.num_food
         self.food_spawn = None
         self.pickup = None
         self.stamina = None
-        self.action_space = Discrete(5) # UDLRC
+        self.action_space = Discrete(360 ) # UDLRC
         self.observation_space = Dict({
             "agent_pos": MultiBinary(self.grid_size**2),
             "local_food": MultiBinary(self.agent_vision**2),
@@ -90,7 +90,7 @@ class CustomEnvironment(ParallelEnv):
     # the reward for taking that actions, 
     # if the environment has terminated or truncated due to the latest action and information from the environment about the step, i.e. metrics, debug info.
     # gymnasium.Env.step(self, action: ActType) → tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]
-    def step(self, action_n):
+    def step(self, id, action_n):
         # Discrete(5) is ordered as up, down, left, right, collect food
         agent_actions = {}
         for agent_id in range(self.num_agents):
@@ -129,7 +129,7 @@ class CustomEnvironment(ParallelEnv):
     #The Space object corresponding to valid actions, 
     #all valid actions should be contained within the space.
     def action_space(self, agent):
-        return Discrete(5) #up, down ,left ,right, collect food
+        return Discrete(360) #up, down ,left ,right, collect food
     
     def close(self):
         #close pygame and clear data here
