@@ -177,9 +177,10 @@ class CustomEnvironment(ParallelEnv):
         # self.escape_y = random.randint(2, 5)
 
         # observation = (
-        #     self.prisoner_x + 7 * self.prisoner_y,
-        #     self.guard_x + 7 * self.guard_y,
-        #     self.escape_x + 7 * self.escape_y,
+        #     a = { self.prisoner_x + 7 * self.prisoner_y,
+        #           self.guard_x + 7 * self.guard_y,
+        #           self.escape_x + 7 * self.escape_y,
+        #         }
         # )
         # observations = {
         #     "prisoner": {"observation": observation, "action_mask": [0, 1, 1, 0]},
