@@ -71,7 +71,6 @@ class CustomEnvironment(ParallelEnv):
         self.grid_size_y = 100
         self.timestep = None
 
-<<<<<<< Updated upstream
         
         #old defs here
         # self.escape_y = None
@@ -126,8 +125,6 @@ class CustomEnvironment(ParallelEnv):
             
 
     
-=======
->>>>>>> Stashed changes
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
