@@ -77,7 +77,6 @@ class CustomEnvironment(ParallelEnv):
 
         # self.timestep = None
 
-<<<<<<< Updated upstream
         
         #old defs here
         # self.escape_y = None
@@ -135,8 +134,6 @@ class CustomEnvironment(ParallelEnv):
     def make_observation_space(self):
         pass
 
-=======
->>>>>>> Stashed changes
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
@@ -179,13 +176,12 @@ class CustomEnvironment(ParallelEnv):
         # self.escape_x = random.randint(2, 5)
         # self.escape_y = random.randint(2, 5)
 
-        observation = (
-
-            a = { self.prisoner_x + 7 * self.prisoner_y,
-                  self.guard_x + 7 * self.guard_y,
-                  self.escape_x + 7 * self.escape_y,
-                }
-        )
+        # observation = (
+        #     a = { self.prisoner_x + 7 * self.prisoner_y,
+        #           self.guard_x + 7 * self.guard_y,
+        #           self.escape_x + 7 * self.escape_y,
+        #         }
+        # )
         # observations = {
         #     "prisoner": {"observation": observation, "action_mask": [0, 1, 1, 0]},
         #     "guard": {"observation": observation, "action_mask": [1, 0, 0, 1]},
