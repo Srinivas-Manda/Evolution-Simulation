@@ -1,7 +1,7 @@
 import functools
 import random
 from copy import copy
-
+import pygame
 import numpy as np
 from gymnasium.spaces import Discrete, MultiDiscrete, Box
 
@@ -28,6 +28,7 @@ class Agent(Entity):
         self.movement_speed = None
         self.agent_id = id
         self.name = name
+        self.reward = 0
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
@@ -63,14 +64,20 @@ class CustomEnvironment(ParallelEnv):
         self.agents = [Agent(agent_name,id) for id,agent_name in enumerate(env_config.agents)] #agent object list
         self.pellets = [Pellet(id) for id in range(env_config.num_pellets)]
         self.num_pellets = env_config.num_pellets
+        # self.agent_positions = [[]]
+        # self.pellets_positions = [[]]
+        # self.max_agent_vision = None
+        self.grid_size_x = env_config.grid_size_x
+        self.grid_size_y = env_config.grid_size_y
+        self.num_agents = None
+        self.agents = []
+        self.max_num_agents = None
+        self.observation_spaces = None
+        self.action_spaces = None
 
-        self.agent_positions = [[]]
-        self.pellets_positions = [[]]
-        self.max_agent_vision = None
-        self.grid_size_x = env_config.grid
-        self.grid_size_y = 100
-        self.timestep = None
+        # self.timestep = None
 
+<<<<<<< Updated upstream
         
         #old defs here
         # self.escape_y = None
@@ -83,10 +90,12 @@ class CustomEnvironment(ParallelEnv):
         # self.possible_agents = ["prisoner", "guard"]
 
     # top is 0, right is 1, bottom is 2, left is 3. clockwise
+    # self.np_random is defined in ParalleEnv
     def init_pos(self):
-        edge = np.random.randint(low = 0, high = 4, size = len(self.agents))
-        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
-        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False)
+
+        edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents))
+        pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
+        pos_y = self.np_random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False)
         for i,agent in enumerate(self.agents):
             if(edge[i]==0 or edge[i] ==2):
                 pos_x = pos_x[i]
@@ -100,14 +109,14 @@ class CustomEnvironment(ParallelEnv):
 
         points = set()
         while len(points) < 10*self.num_pellets: # k means++ will handle this later
-            point_x = np.random.rand(1) * self.grid_size_x
-            point_y = np.random.rand(1) * self.grid_size_y
+            point_x = self.np_random.rand(1) * self.grid_size_x
+            point_y = self.np_random.rand(1) * self.grid_size_y
             points.add((point_x[0],point_y[0]))
         
         points = [list(point) for point in points]
         points = np.array(points)
         
-        init_pellet = np.random.choice(range(len(points)))
+        init_pellet = self.np_random.choice(range(len(points)))
 
         temp_pellets = np.zeros((self.num_pellets, 2))
         temp_pellets[0] = points[init_pellet]
@@ -116,15 +125,18 @@ class CustomEnvironment(ParallelEnv):
             distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
             probs = distances ** 2
             probs /= probs.sum(axis=0)
-            temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
+            temp_pellets[i] = points[self.np_random.choice(points.shape[0], p=probs)]
 
         for i, pellet in enumerate(self.pellets):
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
 
-        
-            
 
-    
+    #to ease the creation of observation space
+    def make_observation_space(self):
+        pass
+
+=======
+>>>>>>> Stashed changes
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
@@ -141,16 +153,43 @@ class CustomEnvironment(ParallelEnv):
 
         And must set up the environment so that render(), step(), and observe() can be called without issues.
         """
+        super().reset(seed=seed)
+        self.init_pos()
+        # # self.agents = copy(self.possible_agents)
+        # self.timestep = 0
 
+        # Handled in init_pos
+        # self.agent_start_positions = [[0,0], [50,0], [25,0]]
+        # self.agent_positions = copy(self.agent_start_positions)
+        # self.pellets_positions = [[25, 25], [75, 75]]
+        # self.agent_stamina = [100, 100, 100]
+        
+
+
+    #old defs here
         # self.agents = copy(self.possible_agents)
-        self.timestep = 0
+        # self.timestep = 0
 
-    #replace with random initializations later
-        self.agent_start_positions = [[0,0], [50,0], [25,0]]
-        self.agent_positions = copy(self.agent_start_positions)
-        self.pellets_positions = [[25, 25], [75, 75]]
+        # self.prisoner_x = 0
+        # self.prisoner_y = 0
 
-        self.agent_stamina = [100, 100, 100]
+        # self.guard_x = 7
+        # self.guard_y = 7
+
+        # self.escape_x = random.randint(2, 5)
+        # self.escape_y = random.randint(2, 5)
+
+        observation = (
+
+            a = { self.prisoner_x + 7 * self.prisoner_y,
+                  self.guard_x + 7 * self.guard_y,
+                  self.escape_x + 7 * self.escape_y,
+                }
+        )
+        # observations = {
+        #     "prisoner": {"observation": observation, "action_mask": [0, 1, 1, 0]},
+        #     "guard": {"observation": observation, "action_mask": [1, 0, 0, 1]},
+        # }
 
     #temporary shit hai ye bas
         observations = {a: {} for a in self.agents}
@@ -257,11 +296,22 @@ class CustomEnvironment(ParallelEnv):
         print(f"{grid} \n")
 
     # Observation space should be defined here.
-    def observation_space(self, agent):
+    #re-check this for if high = self.max_strength and if low = -1 
+    def observation_space(self, agent_id):
         # gymnasium spaces are defined and documented here: https://gymnasium.farama.org/api/spaces/
-        return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
+        # return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
+
+        return self.observation_space[agent_id]
 
     # Action space should be defined here.
-    def action_space(self, agent):
-        return Discrete(360)
-    
+    def action_space(self, agent_id):
+        # return Discrete(360)
+        return self.action_space[agent_id]
+        
+    # closes the rendering window
+    def close(self):
+        return super().close()
+
+    #returns the state
+    def state(self) -> np.ndarray:
+        return super().state()
