@@ -1,13 +1,17 @@
 {
  "num_pellets" : 3,
  "agents" : ["DQN","AC","SAC"],
- "default_vision" : 5,
+ "default_vision" : 3,
  "default_movement_speed" : 0.5,
  "default_strength" : 10,
  "grid_size_x" : 100,
  "stamina" : 100,
  "grid_size_y" : 100,
- "max_vision" : 10,
+ "max_vision" : 5,
  "max_movement_speed" : 3,
- "max_strength" : 20
+ "max_strength" : 20,
+ "pellet_stamina_gain" : 20,
+ "pellet_collect_reward" : 10,
+ "penalty" : -1,
+ "move_stamina_loss" : -1
 }
