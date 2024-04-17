@@ -20,15 +20,19 @@ class Pellet(Entity):
     def __init__(self, id) -> None:
         super().__init__("Pellet")
         self.pellet_id = id
+        self.active = True
 class Agent(Entity):
     def __init__(self, name, id) -> None:
         super().__init__("Agent")
         self.strength = None
         self.vision_size = None
         self.movement_speed = None
+        self.stamina = None
         self.agent_id = id
         self.name = name
         self.reward = 0
+        self.active = True
+        self.state = "alive"
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
@@ -74,6 +78,10 @@ class CustomEnvironment(ParallelEnv):
         self.max_num_agents = None
         self.observation_spaces = None
         self.action_spaces = None
+        self.pellet_stamina_gain = env_config.pellet_stamina_gain
+        self.pellet_collect_reward = env_config.pellet_collect_reward
+        self.penalty = env_config.penalty
+        self.move_stamina_loss = env_config.move_stamina_loss
 
         # self.timestep = None
 
@@ -195,6 +203,29 @@ class CustomEnvironment(ParallelEnv):
 
         return observations, infos
 
+    def get_entity_collision(agent, entity):
+        #create a box centered on the agent of unit length. this is the bounds of the agent
+        #based on vision(min = 3) based on this, the agent can see upto 3 boxes around itself(square fasion mai)
+        #set the observation matrix of the agent based on the information from the boxes
+        dist_x = agent.pos_x - entity.pos_x
+        dist_y = agent.pos_y - entity.pos_y
+
+        # #entity not within the agent's vision
+        # if(abs(dist_x) > agent.vision_size+0.5 or abs(dist_y) > agent.vision_size+0.5):
+        #     return "NOT_VISIBLE"
+
+        #entity with the pellet's vision and hitting the agent
+        if(abs(dist_x) <= 0.5 and abs(dist_y) <= 0.5):
+            return True
+        
+        return False
+
+        # #find the location in vision of the entity
+        # dist_x = np.floor(abs(dist_x - 3.5))
+        # dist_y = np.floor(abs(dist_y - 3.5))
+        # return dist_x + agent.vision_size * dist_y
+
+
     def step(self, actions):
         """Takes in an action for the current agent (specified by agent_selection).
 
@@ -212,7 +243,7 @@ class CustomEnvironment(ParallelEnv):
         oldAgents = copy(self.agents)
         # Execute actions
         # 1. Move all agents to new positions
-        # 2. Check if any pellets were consumed, remove them from the array(or set their position out of bounds) 
+        # 2. Check if any pellets were consumed, set them as inactive 
         # 3. Update observations for agents
         # 4. Assign rewards
         terminations = {a: False for a in self.agents}
@@ -221,6 +252,11 @@ class CustomEnvironment(ParallelEnv):
         observations = None
         for agent in self.agents:
             #move agent
+            #skip dead agents
+            if(agent.stamina <= 0): 
+                continue
+            
+            agent.stamina -= 1
             action = actions[agent.name]
             
             #YAAD SE APPLY WORLD LIMIT
@@ -237,12 +273,22 @@ class CustomEnvironment(ParallelEnv):
             elif(action == 3 and agent.pos_y < self.grid_size_y):
                 agent.pos_y += agent.movement_speed
 
+            #check for pellet consumption and assign reward
+            for pellet in self.pellets:
+                if(self.get_entity_collision(agent, pellet) and pellet.active):
+                    pellet.active = False
+                    agent.stamina += self.pellet_stamina_gain
+                    agent.reward += self.pellet_collect_reward
+                    rewards[agent.agent_id] = self.pellet_collect_reward
+                else:
+                    agent.stamina -= 1
+                    agent.reward -= self.penalty
+                    rewards[agent.agent_id] = self.penalty
+
             
 
 
         # Check termination conditions
-        terminations = {a: False for a in self.agents}
-        rewards = {a: 0 for a in self.agents}
         if self.prisoner_x == self.guard_x and self.prisoner_y == self.guard_y:
             rewards = {"prisoner": -1, "guard": 1}
             terminations = {a: True for a in self.agents}
