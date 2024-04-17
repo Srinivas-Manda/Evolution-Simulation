@@ -9,5 +9,8 @@
  "grid_size_y" : 100,
  "max_vision" : 10,
  "max_movement_speed" : 3,
- "max_strength" : 20
+ "max_strength" : 20,
+ "screen_width" : 600,
+ "screen_height" : 600,
+ "cell_size" : 50
 }

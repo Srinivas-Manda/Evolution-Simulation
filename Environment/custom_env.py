@@ -8,6 +8,12 @@ from gymnasium.spaces import Discrete, MultiDiscrete, Box
 
 from pettingzoo import ParallelEnv
 
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+
 class Entity:
     def __init__(self, type = None) -> None:
         self.pos_x = None
@@ -66,8 +72,8 @@ class CustomEnvironment(ParallelEnv):
         self.pellets = [Pellet(id) for id in range(env_config.num_pellets)]
         self.num_pellets = env_config.num_pellets
 
-        self.grid_size_x = env_config.grid_size_x
-        self.grid_size_y = env_config.grid_size_y
+        self.grid_size_x = env_config.grid_size_x # [0,x)
+        self.grid_size_y = env_config.grid_size_y #[0,y)
         self.num_agents = env_config.agents
         self.agents = []
         self.max_num_agents = env_config.max_num_agents
@@ -77,25 +83,27 @@ class CustomEnvironment(ParallelEnv):
 
 
     # top is 0, right is 1, bottom is 2, left is 3. clockwise
-    # self.np_random is defined in ParalleEnv
+    # self.np_random is defined in ParalleEnv. it is used to seed the randomnes
     def init_pos(self):
 
-        edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents))
-        pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
-        pos_y = self.np_random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False)
-        for i,agent in enumerate(self.agents):
-            if(edge[i]==0 or edge[i] ==2):
+        edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents)) # to pick an edge to initialise the agent on
+        pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False) # then to pick an x value for all agents
+        pos_y = self.np_random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False) # then to pick an y value for all agents
+
+        for i,agent in enumerate(self.agents): # iterating over all agents
+            if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
                 pos_x = pos_x[i]
                 pos_y = self.grid_size_y-1 if edge[i]==2 else 0
                 
-            elif(edge[i]==1 or edge[i] ==3):
+            elif(edge[i]==1 or edge[i] ==3): # if left or right edge
                 pos_y = pos_y[i]
                 pos_x = self.grid_size_x-1 if edge[i]==1 else 0
             
-            agent.update_pos(pos_x,pos_y)
+            agent.update_pos(pos_x,pos_y) # setting the position of agent
 
-        points = set()
-        while len(points) < 10*self.num_pellets: # k-means++ will handle this later
+        points = set() # creating a set for different pellets
+
+        while len(points) < 10*self.num_pellets: # need 10 times necessary possible positions for the pellets for k-means++ sampling
             point_x = self.np_random.rand(1) * self.grid_size_x
             point_y = self.np_random.rand(1) * self.grid_size_y
             points.add((point_x[0],point_y[0]))
@@ -103,6 +111,7 @@ class CustomEnvironment(ParallelEnv):
         points = [list(point) for point in points]
         points = np.array(points)
         
+        #k-means++ start
         init_pellet = self.np_random.choice(range(len(points)))
 
         temp_pellets = np.zeros((self.num_pellets, 2))
@@ -114,50 +123,56 @@ class CustomEnvironment(ParallelEnv):
             probs /= probs.sum(axis=0)
             temp_pellets[i] = points[self.np_random.choice(points.shape[0], p=probs)]
 
+        #k-means++ end
+
+        #pellet positions are updated
         for i, pellet in enumerate(self.pellets):
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
 
 
     #to ease the creation of observation space
+    #vision size
     def make_observation_space(self,agent):
-        temp = Box(low = -1, high = -1,shape=(3,self.max_vision_size*2,self.max_vision_size*2),dtype=np.int32)
+        temp = Box(low = -1, high = -1, shape=(3, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.int32)
         box = temp.sample()
-        agent_pos = []
+        agent_pos = {}
         pellet_pos = []
 
         for temp_agent in self.agents:
             if(temp_agent.agent_id != agent.agent_id):
-                agent_pos.append(math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y))
+                agent_pos[temp_agent.agent_id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
 
         for temp_pellet in self.pellets:
             pellet_pos.append(math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y))
 
-        #agents
         # using val to fix for the odd or even vision size
-        for i in range(-agent.vision_size , agent.vision_size + 1 ):
-            for j in range(-agent.vision_size , agent.vision_size + 1):
+        for i in range(-agent.vision_size, agent.vision_size + 1 ):
+            for j in range(-agent.vision_size, agent.vision_size + 1):
 
-                x = math.floor(agent.pos_x)+i
-                y = math.floor(agent.pos_y)+j
-
-                #inside the vision size but outside the grid
-                if  x < 0 or x > self.grid_size_x or y < 0 or y > self.grid_size_y:
-                    box[0][x][y] = 0
-                    box[1][x][y] = 0 
-                    box[2][x][y] = 1
-
-                #inside the vision size and grid and is another agent
-                elif [x,y] in agent_pos:
-                    box[0][x][y] = 1
+                #recheck these two
+                x = math.floor(agent.pos_x + i)
+                y = math.floor(agent.pos_y + j)
+                
+                box[0,x,y] = 0
+                box[1,x,y] = 0
+                box[2,x,y] = 0
+                
+                for tup in agent_pos.items:
+                    id,pos = tup
+                    # if inside the vision size, then set the strength of the other agent as the value 
+                    if [x,y] == pos:
+                        box[0,x,y] = self.agents[id].strength
 
                 #inside the vision size and grid and is a pellet 
-                elif [x,y] in pellet_pos:
-                    box[1][x][y] = 1
+                if [x,y] in pellet_pos:
+                    box[1,x,y] = 1
 
-                #inside the vision size and grid and is neither a pellet nor an agent meaning its empty space
-                else:
-                    box[0][i][j] = 0
+                #inside the vision size but outside the grid
+                if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
+                    box[2,x,y] = 1
 
+
+        return box
 
 
     def reset(self, seed=None, options=None):
@@ -176,13 +191,15 @@ class CustomEnvironment(ParallelEnv):
 
         And must set up the environment so that render(), step(), and observe() can be called without issues.
         """
-        super().reset(seed=seed)
-        self.init_pos()
+        super().reset(seed=seed) #set seed if necessary
+        self.init_pos() # initialise the positions of all agents and all the pellets
 
+        #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
           a.id : self.make_observation_space(a) for a in self.agents
         }
 
+        #havent thought up of necessary info
         self.infos = {a.id : {} for a in self.agents}
 
         return self.observation_spaces, self.infos
@@ -275,29 +292,21 @@ class CustomEnvironment(ParallelEnv):
         return observations, rewards, terminations, truncations, infos
 
     def render(self):
-        """Renders the environment."""
-        grid = np.zeros((7, 7))
-        # grid = map(str, grid)
-        grid[self.prisoner_y, self.prisoner_x] = "1"
-        grid[self.guard_y, self.guard_x] = "2"
-        grid[self.escape_y, self.escape_x] = "9"
-        print(f"{grid} \n")
+        self.screen = pygame.display.set_mode((self.grid_size_x,self.grid_size_y))
+        pygame.display.set_caption("Evolution Simulation")
 
     # Observation space should be defined here.
-    #re-check this for if high = self.max_strength and if low = -1 
     def observation_space(self, agent_id):
-        # gymnasium spaces are defined and documented here: https://gymnasium.farama.org/api/spaces/
-        # return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32
         return self.observation_space[agent_id]
 
     # Action space should be defined here.
     def action_space(self, agent_id):
-        # return Discrete(360)
-        return self.action_space[agent_id]
+        return Discrete(360)
         
     # closes the rendering window
     def close(self):
-        return super().close()
+        self.env.close()
+        pygame.quit()
 
     #returns the state
     def state(self) -> np.ndarray:
