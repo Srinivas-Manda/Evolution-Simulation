@@ -71,6 +71,7 @@ class CustomEnvironment(ParallelEnv):
         self.grid_size_y = 100
         self.timestep = None
 
+<<<<<<< Updated upstream
         
         #old defs here
         # self.escape_y = None
@@ -125,6 +126,8 @@ class CustomEnvironment(ParallelEnv):
             
 
     
+=======
+>>>>>>> Stashed changes
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
@@ -142,7 +145,7 @@ class CustomEnvironment(ParallelEnv):
         And must set up the environment so that render(), step(), and observe() can be called without issues.
         """
 
-        self.agents = copy(self.possible_agents)
+        # self.agents = copy(self.possible_agents)
         self.timestep = 0
 
     #replace with random initializations later
@@ -151,31 +154,6 @@ class CustomEnvironment(ParallelEnv):
         self.pellets_positions = [[25, 25], [75, 75]]
 
         self.agent_stamina = [100, 100, 100]
-        
-
-
-    #old defs here
-        # self.agents = copy(self.possible_agents)
-        # self.timestep = 0
-
-        # self.prisoner_x = 0
-        # self.prisoner_y = 0
-
-        # self.guard_x = 7
-        # self.guard_y = 7
-
-        # self.escape_x = random.randint(2, 5)
-        # self.escape_y = random.randint(2, 5)
-
-        # observation = (
-        #     self.prisoner_x + 7 * self.prisoner_y,
-        #     self.guard_x + 7 * self.guard_y,
-        #     self.escape_x + 7 * self.escape_y,
-        # )
-        # observations = {
-        #     "prisoner": {"observation": observation, "action_mask": [0, 1, 1, 0]},
-        #     "guard": {"observation": observation, "action_mask": [1, 0, 0, 1]},
-        # }
 
     #temporary shit hai ye bas
         observations = {a: {} for a in self.agents}
@@ -199,58 +177,36 @@ class CustomEnvironment(ParallelEnv):
 
         And any internal state used by observe() or render()
         """
+        oldAgents = copy(self.agents)
         # Execute actions
-        prisoner_action = actions["prisoner"]
-        guard_action = actions["guard"]
+        # 1. Move all agents to new positions
+        # 2. Check if any pellets were consumed, remove them from the array(or set their position out of bounds) 
+        # 3. Update observations for agents
+        # 4. Assign rewards
+        terminations = {a: False for a in self.agents}
+        rewards = {a : 0 for a in self.agents}
+        truncations = None
+        observations = None
+        for agent in self.agents:
+            #move agent
+            action = actions[agent.name]
+            
+            #YAAD SE APPLY WORLD LIMIT
+            #move left
+            if(action == 0 and agent.pos_x > 0):
+                agent.pos_x -= agent.movement_speed
+            #move right
+            elif(action == 2 and agent.pos_x < self.grid_size_x):
+                agent.pos_x += agent.movement_speed
+            #move up
+            elif(action == 1 and agent.pos_y > 0):
+                agent.pos_y -= agent.movement_speed
+            #move down
+            elif(action == 3 and agent.pos_y < self.grid_size_y):
+                agent.pos_y += agent.movement_speed
 
-        if prisoner_action == 0 and self.prisoner_x > 0:
-            self.prisoner_x -= 1
-        elif prisoner_action == 1 and self.prisoner_x < 6:
-            self.prisoner_x += 1
-        elif prisoner_action == 2 and self.prisoner_y > 0:
-            self.prisoner_y -= 1
-        elif prisoner_action == 3 and self.prisoner_y < 6:
-            self.prisoner_y += 1
+            
 
-        if guard_action == 0 and self.guard_x > 0:
-            self.guard_x -= 1
-        elif guard_action == 1 and self.guard_x < 6:
-            self.guard_x += 1
-        elif guard_action == 2 and self.guard_y > 0:
-            self.guard_y -= 1
-        elif guard_action == 3 and self.guard_y < 6:
-            self.guard_y += 1
-
-        # Generate action masks
-        prisoner_action_mask = np.ones(4, dtype=np.int8)
-        if self.prisoner_x == 0:
-            prisoner_action_mask[0] = 0  # Block left movement
-        elif self.prisoner_x == 6:
-            prisoner_action_mask[1] = 0  # Block right movement
-        if self.prisoner_y == 0:
-            prisoner_action_mask[2] = 0  # Block down movement
-        elif self.prisoner_y == 6:
-            prisoner_action_mask[3] = 0  # Block up movement
-
-        guard_action_mask = np.ones(4, dtype=np.int8)
-        if self.guard_x == 0:
-            guard_action_mask[0] = 0
-        elif self.guard_x == 6:
-            guard_action_mask[1] = 0
-        if self.guard_y == 0:
-            guard_action_mask[2] = 0
-        elif self.guard_y == 6:
-            guard_action_mask[3] = 0
-
-        # Action mask to prevent guard from going over escape cell
-        if self.guard_x - 1 == self.escape_x:
-            guard_action_mask[0] = 0
-        elif self.guard_x + 1 == self.escape_x:
-            guard_action_mask[1] = 0
-        if self.guard_y - 1 == self.escape_y:
-            guard_action_mask[2] = 0
-        elif self.guard_y + 1 == self.escape_y:
-            guard_action_mask[3] = 0
 
         # Check termination conditions
         terminations = {a: False for a in self.agents}
