@@ -77,7 +77,6 @@ class CustomEnvironment(ParallelEnv):
 
         # self.timestep = None
 
-<<<<<<< Updated upstream
         
         #old defs here
         # self.escape_y = None
@@ -135,8 +134,6 @@ class CustomEnvironment(ParallelEnv):
     def make_observation_space(self):
         pass
 
-=======
->>>>>>> Stashed changes
     def reset(self, env_config,seed=None, options=None):
         """Reset set the environment to a starting point.
 
