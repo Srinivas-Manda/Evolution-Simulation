@@ -23,6 +23,7 @@ class Entity:
     def update_pos(self, x, y):
         self.pos_x = x
         self.pos_y = y
+
 class Pellet(Entity):
     def __init__(self, id) -> None:
         super().__init__("Pellet")
@@ -153,6 +154,7 @@ class CustomEnvironment(ParallelEnv):
                 x = math.floor(agent.pos_x + i)
                 y = math.floor(agent.pos_y + j)
                 
+                #initiate nothing is of intrest in these
                 box[0,x,y] = 0
                 box[1,x,y] = 0
                 box[2,x,y] = 0
