@@ -2,6 +2,7 @@ import functools
 import random
 from copy import copy
 import pygame
+import pygame
 import numpy as np
 from gymnasium.spaces import Discrete, MultiDiscrete, Box
 
@@ -21,6 +22,7 @@ class Pellet(Entity):
         super().__init__("Pellet")
         self.pellet_id = id
         self.active = True
+        self.active = True
 class Agent(Entity):
     def __init__(self, name, id) -> None:
         super().__init__("Agent")
@@ -28,8 +30,12 @@ class Agent(Entity):
         self.vision_size = None
         self.movement_speed = None
         self.stamina = None
+        self.stamina = None
         self.agent_id = id
         self.name = name
+        self.reward = 0
+        self.active = True
+        self.state = "alive"
         self.reward = 0
         self.active = True
         self.state = "alive"
@@ -84,6 +90,22 @@ class CustomEnvironment(ParallelEnv):
         self.move_stamina_loss = env_config.move_stamina_loss
 
         # self.timestep = None
+        # self.agent_positions = [[]]
+        # self.pellets_positions = [[]]
+        # self.max_agent_vision = None
+        self.grid_size_x = env_config.grid_size_x
+        self.grid_size_y = env_config.grid_size_y
+        self.num_agents = None
+        self.agents = []
+        self.max_num_agents = None
+        self.observation_spaces = None
+        self.action_spaces = None
+        self.pellet_stamina_gain = env_config.pellet_stamina_gain
+        self.pellet_collect_reward = env_config.pellet_collect_reward
+        self.penalty = env_config.penalty
+        self.move_stamina_loss = env_config.move_stamina_loss
+
+        # self.timestep = None
 
         
         #old defs here
@@ -98,7 +120,12 @@ class CustomEnvironment(ParallelEnv):
 
     # top is 0, right is 1, bottom is 2, left is 3. clockwise
     # self.np_random is defined in ParalleEnv
+    # self.np_random is defined in ParalleEnv
     def init_pos(self):
+
+        edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents))
+        pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
+        pos_y = self.np_random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False)
 
         edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents))
         pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False)
@@ -118,11 +145,14 @@ class CustomEnvironment(ParallelEnv):
         while len(points) < 10*self.num_pellets: # k means++ will handle this later
             point_x = self.np_random.rand(1) * self.grid_size_x
             point_y = self.np_random.rand(1) * self.grid_size_y
+            point_x = self.np_random.rand(1) * self.grid_size_x
+            point_y = self.np_random.rand(1) * self.grid_size_y
             points.add((point_x[0],point_y[0]))
         
         points = [list(point) for point in points]
         points = np.array(points)
         
+        init_pellet = self.np_random.choice(range(len(points)))
         init_pellet = self.np_random.choice(range(len(points)))
 
         temp_pellets = np.zeros((self.num_pellets, 2))
@@ -133,9 +163,15 @@ class CustomEnvironment(ParallelEnv):
             probs = distances ** 2
             probs /= probs.sum(axis=0)
             temp_pellets[i] = points[self.np_random.choice(points.shape[0], p=probs)]
+            temp_pellets[i] = points[self.np_random.choice(points.shape[0], p=probs)]
 
         for i, pellet in enumerate(self.pellets):
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
+
+
+    #to ease the creation of observation space
+    def make_observation_space(self):
+        pass
 
 
     #to ease the creation of observation space
@@ -226,6 +262,29 @@ class CustomEnvironment(ParallelEnv):
         # return dist_x + agent.vision_size * dist_y
 
 
+    def get_entity_collision(agent, entity):
+        #create a box centered on the agent of unit length. this is the bounds of the agent
+        #based on vision(min = 3) based on this, the agent can see upto 3 boxes around itself(square fasion mai)
+        #set the observation matrix of the agent based on the information from the boxes
+        dist_x = agent.pos_x - entity.pos_x
+        dist_y = agent.pos_y - entity.pos_y
+
+        # #entity not within the agent's vision
+        # if(abs(dist_x) > agent.vision_size+0.5 or abs(dist_y) > agent.vision_size+0.5):
+        #     return "NOT_VISIBLE"
+
+        #entity with the pellet's vision and hitting the agent
+        if(abs(dist_x) <= 0.5 and abs(dist_y) <= 0.5):
+            return True
+        
+        return False
+
+        # #find the location in vision of the entity
+        # dist_x = np.floor(abs(dist_x - 3.5))
+        # dist_y = np.floor(abs(dist_y - 3.5))
+        # return dist_x + agent.vision_size * dist_y
+
+
     def step(self, actions):
         """Takes in an action for the current agent (specified by agent_selection).
 
@@ -244,6 +303,7 @@ class CustomEnvironment(ParallelEnv):
         # Execute actions
         # 1. Move all agents to new positions
         # 2. Check if any pellets were consumed, set them as inactive 
+        # 2. Check if any pellets were consumed, set them as inactive 
         # 3. Update observations for agents
         # 4. Assign rewards
         terminations = {a: False for a in self.agents}
@@ -252,6 +312,11 @@ class CustomEnvironment(ParallelEnv):
         observations = None
         for agent in self.agents:
             #move agent
+            #skip dead agents
+            if(agent.stamina <= 0): 
+                continue
+            
+            agent.stamina -= 1
             #skip dead agents
             if(agent.stamina <= 0): 
                 continue
@@ -272,6 +337,18 @@ class CustomEnvironment(ParallelEnv):
             #move down
             elif(action == 3 and agent.pos_y < self.grid_size_y):
                 agent.pos_y += agent.movement_speed
+
+            #check for pellet consumption and assign reward
+            for pellet in self.pellets:
+                if(self.get_entity_collision(agent, pellet) and pellet.active):
+                    pellet.active = False
+                    agent.stamina += self.pellet_stamina_gain
+                    agent.reward += self.pellet_collect_reward
+                    rewards[agent.agent_id] = self.pellet_collect_reward
+                else:
+                    agent.stamina -= 1
+                    agent.reward -= self.penalty
+                    rewards[agent.agent_id] = self.penalty
 
             #check for pellet consumption and assign reward
             for pellet in self.pellets:
@@ -340,12 +417,28 @@ class CustomEnvironment(ParallelEnv):
     # Observation space should be defined here.
     #re-check this for if high = self.max_strength and if low = -1 
     def observation_space(self, agent_id):
+    #re-check this for if high = self.max_strength and if low = -1 
+    def observation_space(self, agent_id):
         # gymnasium spaces are defined and documented here: https://gymnasium.farama.org/api/spaces/
+        # return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
+
+        return self.observation_space[agent_id]
         # return Box(low = -1, high = self.max_strength,shape=(3,self.max_agent_vision,self.max_agent_vision),dtype=np.int32)
 
         return self.observation_space[agent_id]
 
     # Action space should be defined here.
+    def action_space(self, agent_id):
+        # return Discrete(360)
+        return self.action_space[agent_id]
+        
+    # closes the rendering window
+    def close(self):
+        return super().close()
+
+    #returns the state
+    def state(self) -> np.ndarray:
+        return super().state()
     def action_space(self, agent_id):
         # return Discrete(360)
         return self.action_space[agent_id]
