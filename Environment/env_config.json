@@ -1,16 +1,25 @@
 {
  "num_pellets" : 3,
  "agents" : ["DQN","AC","SAC"],
- "default_vision" : 5,
+ "num_agents": 3,
+
+ "default_vision" : 3,
  "default_movement_speed" : 0.5,
  "default_strength" : 10,
- "grid_size_x" : 100,
  "stamina" : 100,
- "grid_size_y" : 100,
- "max_vision" : 10,
- "max_movement_speed" : 3,
+ "max_vision" : 8,
+ "max_movement_speed" : 0.5,
  "max_strength" : 20,
+ 
+ "grid_size_x" : 100,
+ "grid_size_y" : 100,
+
  "screen_width" : 600,
  "screen_height" : 600,
- "cell_size" : 50
+ "cell_size" : 50,
+
+ "move_penalty" : 1,
+ "pellet_stamina_gain" : 20,
+ "pellet_collect_reward": 40,
+ "move_stamina_loss" : 1
 }
