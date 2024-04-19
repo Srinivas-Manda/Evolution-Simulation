@@ -29,7 +29,7 @@ class Pellet(Entity):
     def __init__(self, id) -> None:
         super().__init__("Pellet")
         self.pellet_id = id
-        
+
 class Agent(Entity):
     def __init__(self, name, id) -> None:
         super().__init__("Agent")
@@ -74,39 +74,38 @@ class CustomEnvironment(ParallelEnv):
 
         """
         #THESE ATTRIBUTES SHOULD NOT CHANGE AFTER INTIALIZATION
-    
         #temporary agents and pellets list to store names, ids and their respective attributes
-        self.possible_agents = [Agent(agent_name,id) for id,agent_name in enumerate(env_config.agents)]
-        self.possible_pellets = [Pellet(id) for id in range(env_config.num_pellets)]
+        self.possible_agents = [Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])]
+        self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
         for a in self.possible_agents:
-            a.strength = env_config.default_strength
-            a.vision_size = env_config.default_vision_size
-            a.movement_speed = env_config.default_movement_speed
+            a.strength = env_config["default_strength"]
+            a.vision_size = env_config["default_vision"]
+            a.movement_speed = env_config["default_movement_speed"]
 
         #initial number of pellets and agent's starting stamina  
-        self.num_pellets = env_config.num_pellets
-        self.num_agents = env_config.num_agents
-        self.agents_starting_stamina = env_config.stamina
+        self.num_pellets = env_config["num_pellets"]
+        # self.num_agents = env_config["num_agents"]
+        self.agents_starting_stamina = env_config['stamina']
 
         #grid sizes
-        self.grid_size_x = env_config.grid_size_x # [0,x)
-        self.grid_size_y = env_config.grid_size_y #[0,y)
+        self.grid_size_x = env_config['grid_size_x'] # [0,x)
+        self.grid_size_y = env_config['grid_size_y'] #[0,y)
 
         #screen parameters for rendering
-        self.screen_width = env_config.screen_width
-        self.screen_height = env_config.screen_height
+        self.screen_width = env_config['screen_width']
+        self.screen_height = env_config['screen_height']
     
         # self.observation_spaces = None
         # self.action_spaces = None
 
         #rewards and penalties
-        self.pellet_stamina_gain = env_config.pellet_stamina_gain
-        self.pellet_collect_reward = env_config.pellet_collect_reward
+        self.pellet_stamina_gain = env_config['pellet_stamina_gain']
+        self.pellet_collect_reward = env_config['pellet_collect_reward']
 
         #max values of agent attributes
-        self.move_penalty = env_config.move_penalty
-        self.move_stamina_loss = env_config.move_stamina_loss
-        self.max_vision_size = env_config.max_vision
+        self.move_penalty = env_config['move_penalty']
+        self.move_stamina_loss = env_config['move_stamina_loss']
+        self.max_vision_size = env_config['max_vision']
 
         self.timestep = None
 
@@ -126,7 +125,7 @@ class CustomEnvironment(ParallelEnv):
 
         And must set up the environment so that render(), step(), and observe() can be called without issues.
         """
-        super().reset(seed=seed) #set seed if necessary
+        # super().reset(seed=seed) #set seed if necessary
 
         self.agents = copy(self.possible_agents) #agent object list
         self.pellets = copy(self.possible_pellets)
@@ -235,9 +234,9 @@ class CustomEnvironment(ParallelEnv):
     # self.np_random is defined in ParalleEnv. it is used to seed the randomnes
     def init_pos(self):
 
-        edge = self.np_random.randint(low = 0, high = 4, size = len(self.agents)) # to pick an edge to initialise the agent on
-        pos_x = self.np_random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False) # then to pick an x value for all agents
-        pos_y = self.np_random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False) # then to pick an y value for all agents
+        edge = np.random.randint(low = 0, high = 4, size = len(self.agents)) # to pick an edge to initialise the agent on
+        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False) # then to pick an x value for all agents
+        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False) # then to pick an y value for all agents
 
         for i,agent in enumerate(self.agents): # iterating over all agents
             if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
@@ -253,15 +252,15 @@ class CustomEnvironment(ParallelEnv):
         points = set() # creating a set for different pellets
 
         while len(points) < 10*self.num_pellets: # need 10 times necessary possible positions for the pellets for k-means++ sampling
-            point_x = self.np_random.rand(1) * self.grid_size_x
-            point_y = self.np_random.rand(1) * self.grid_size_y
+            point_x = np.random.rand(1) * self.grid_size_x
+            point_y = np.random.rand(1) * self.grid_size_y
             points.add((point_x[0],point_y[0]))
         
         points = [list(point) for point in points]
         points = np.array(points)
         
         #k-means++ start
-        init_pellet = self.np_random.choice(range(len(points)))
+        init_pellet = np.random.choice(range(len(points)))
 
         temp_pellets = np.zeros((self.num_pellets, 2))
         temp_pellets[0] = points[init_pellet]
@@ -270,7 +269,7 @@ class CustomEnvironment(ParallelEnv):
             distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
             probs = distances ** 2
             probs /= probs.sum(axis=0)
-            temp_pellets[i] = points[self.np_random.choice(points.shape[0], p=probs)]
+            temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
 
         #k-means++ end
 
