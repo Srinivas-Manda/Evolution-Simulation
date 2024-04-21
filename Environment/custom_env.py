@@ -37,7 +37,7 @@ class Agent(Entity):
         self.vision_size = None
         self.movement_speed = None
         self.stamina = None
-        self.agent_id = id
+        self.id = id
         self.name = name
         self.reward = 0
         self.active = True
@@ -75,9 +75,10 @@ class CustomEnvironment(ParallelEnv):
         """
         #THESE ATTRIBUTES SHOULD NOT CHANGE AFTER INTIALIZATION
         #temporary agents and pellets list to store names, ids and their respective attributes
-        self.possible_agents = [Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])]
+        self.possible_agents_objects = [Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])]
+        self.possible_agents = [i for i in range(len(self.possible_agents_objects))]
         self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
-        for a in self.possible_agents:
+        for a in self.possible_agents_objects:
             a.strength = env_config["default_strength"]
             a.vision_size = env_config["default_vision"]
             a.movement_speed = env_config["default_movement_speed"]
@@ -107,8 +108,6 @@ class CustomEnvironment(ParallelEnv):
         self.move_stamina_loss = env_config['move_stamina_loss']
         self.max_vision_size = env_config['max_vision']
 
-        self.timestep = None
-
     def reset(self, seed=None, options=None):
         """Reset set the environment to a starting point.
 
@@ -127,26 +126,29 @@ class CustomEnvironment(ParallelEnv):
         """
         # super().reset(seed=seed) #set seed if necessary
 
-        self.agents = copy(self.possible_agents) #agent object list
+        self.agents = copy(self.possible_agents) #agent id list
+        self.agents_objects = copy(self.possible_agents_objects) #agent object list
         self.pellets = copy(self.possible_pellets)
-        for a in self.agents:
+        for a in self.agents_objects:
             a.stamina = self.agents_starting_stamina
 
         self.init_pos() # initialise the positions of all agents and all the pellets
+        print(self.agents_objects)
 
         self.timestep = 0
 
         #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
-          a.id : self.make_observation_space(a) for a in self.agents
+          a.id : self.make_observation_space(a) for a in self.agents_objects
         }
-
-        #havent thought up of necessary info
-        self.infos = {a.id : {} for a in self.agents}
+        
+        #havent thought up of necessary infos
+        self.infos = {a.id : {} for a in self.agents_objects}
 
         return self.observation_spaces, self.infos
         
     def step(self, actions):
+        # print("step")
         """Takes in an action for the current agent (specified by agent_selection).
 
         Needs to update:
@@ -165,12 +167,12 @@ class CustomEnvironment(ParallelEnv):
         # 2. Check if any pellets were consumed, set them as inactive 
         # 3. Update observations for agents
         # 4. Assign rewards
-        terminations = {a.id : False for a in self.agents}
-        rewards = {a.id : 0 for a in self.agents}
+        terminations = {a.id : False for a in self.agents_objects}
+        rewards = {a.id : 0 for a in self.agents_objects}
         truncations = None
         observations = None
         infos = None
-        for agent in self.agents:
+        for i, agent in enumerate(self.agents_objects):
             #move agent
             #skip dead agents
             if(agent.state == "dead" or agent.active == False): 
@@ -208,23 +210,24 @@ class CustomEnvironment(ParallelEnv):
                     rewards[agent.id] = self.move_penalty
 
             if(agent.stamina == 0):
-                agent.state = "dead"
-                agent.active = False
+                # agent.state = "dead"
+                # agent.active = False
                 terminations[agent.id] = True
+                self.agents_objects.remove(i)
 
         #update observation
-        observations = {a.id : self.make_observation_space(a) for a in self.agents}
+        observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
 
         # Check truncation conditions (overwrites termination conditions)
-        truncations = {a.id : False for a in self.agents}
+        truncations = {a.id : False for a in self.agents_objects}
         if(self.timestep) > 500:
-            rewards = {a.id : 0 for a in self.agents}
-            truncations = {a.id : True for a in self.agents}
-            self.agents = []
+            rewards = {a.id : 0 for a in self.agents_objects}
+            truncations = {a.id : True for a in self.agents_objects}
+            self.agents_objects = []
         self.timestep += 1
 
         # Get dummy infos (not used in this example)
-        infos = {a : {} for a in self.agents}
+        infos = {a : {} for a in self.agents_objects}
 
         # self.render()
 
@@ -234,20 +237,20 @@ class CustomEnvironment(ParallelEnv):
     # self.np_random is defined in ParalleEnv. it is used to seed the randomnes
     def init_pos(self):
 
-        edge = np.random.randint(low = 0, high = 4, size = len(self.agents)) # to pick an edge to initialise the agent on
-        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents), replace= False) # then to pick an x value for all agents
-        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents), replace= False) # then to pick an y value for all agents
+        edge = np.random.randint(low = 0, high = 4, size = len(self.agents_objects)) # to pick an edge to initialise the agent on
+        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents_objects), replace= False) # then to pick an x value for all agents
+        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
 
-        for i,agent in enumerate(self.agents): # iterating over all agents
+        for i,agent in enumerate(self.agents_objects): # iterating over all agents
             if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
-                pos_x = pos_x[i]
-                pos_y = self.grid_size_y-1 if edge[i]==2 else 0
+                x = pos_x[i]
+                y = self.grid_size_y-1 if edge[i]==2 else 0
                 
             elif(edge[i]==1 or edge[i] ==3): # if left or right edge
-                pos_y = pos_y[i]
-                pos_x = self.grid_size_x-1 if edge[i]==1 else 0
+                y = pos_y[i]
+                x = self.grid_size_x-1 if edge[i]==1 else 0
             
-            agent.update_pos(pos_x,pos_y) # setting the position of agent
+            agent.update_pos(x,y) # setting the position of agent
 
         points = set() # creating a set for different pellets
 
@@ -278,7 +281,7 @@ class CustomEnvironment(ParallelEnv):
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
 
     #check for hit of an agent with any entity
-    def get_entity_collision(agent, entity):
+    def get_entity_collision(self, agent, entity):
         #create a box centered on the agent of unit length. this is the bounds of the agent
         #based on vision(min = 3) based on this, the agent can see upto 3 boxes around itself(square fasion mai)
         #set the observation matrix of the agent based on the information from the boxes
@@ -307,12 +310,12 @@ class CustomEnvironment(ParallelEnv):
         agent_pos = {}
         pellet_pos = []
 
-        for temp_agent in self.agents:
-            if(temp_agent.agent_id != agent.agent_id):
-                agent_pos[temp_agent.agent_id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
+        for temp_agent in self.agents_objects:
+            if(temp_agent.id != agent.id):
+                agent_pos[temp_agent.id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
 
         for temp_pellet in self.pellets:
-            pellet_pos.append(math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y))
+            pellet_pos.append([math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y)])
 
         # using val to fix for the odd or even vision size
         for i in range(-agent.vision_size, agent.vision_size + 1 ):
@@ -322,24 +325,24 @@ class CustomEnvironment(ParallelEnv):
                 x = math.floor(agent.pos_x + i)
                 y = math.floor(agent.pos_y + j)
                 
-                #initiate nothing is of intrest in these
-                box[0,x,y] = 0
-                box[1,x,y] = 0
-                box[2,x,y] = 0
+                #initiate nothing is of interest in these
+                box[0,self.max_vision_size+i,self.max_vision_size+j] = 0
+                box[1,self.max_vision_size+i,self.max_vision_size+j] = 0
+                box[2,self.max_vision_size+i,self.max_vision_size+j] = 0
                 
-                for tup in agent_pos.items:
+                for tup in agent_pos.items():
                     id,pos = tup
                     # if inside the vision size, then set the strength of the other agent as the value 
                     if [x,y] == pos:
-                        box[0,x,y] = self.agents[id].strength
+                        box[0,self.max_vision_size+i,self.max_vision_size+j] = self.agents_objects[id].strength
 
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
-                    box[1,x,y] = 1
+                    box[1,self.max_vision_size+i,self.max_vision_size+j] = 1
 
                 #inside the vision size but outside the grid
                 if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
-                    box[2,x,y] = 1
+                    box[2,self.max_vision_size+i,self.max_vision_size+j] = 1
 
         return box
 
@@ -348,11 +351,13 @@ class CustomEnvironment(ParallelEnv):
         pygame.display.set_caption("Evolution Simulation")
 
     # Observation space should be defined here.
-    def observation_space(self, agent_id):
-        return self.observation_space[agent_id]
+    @functools.lru_cache(maxsize=None)
+    def observation_space(self, id):
+        return self.observation_spaces[id]
 
     # Action space should be defined here.
-    def action_space(self, agent_id):
+    @functools.lru_cache(maxsize=None)
+    def action_space(self, id):
         return Discrete(360)
         
     # closes the rendering window
