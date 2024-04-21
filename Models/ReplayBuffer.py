@@ -6,9 +6,10 @@ from scipy.special import softmax
 import numpy as np
 
 from collections import deque, namedtuple
+from tqdm import tqdm
 
 # The transition that will be stored in the replay buffer
-Transition = namedtuple("Transition", ("state", "action", "reward", "next_state", "loss"))
+Transition = namedtuple("Transition", ("state", "action", "reward", "next_state", "log_probability"))
 
 # The replay buffer to sample from
 class ReplayBuffer:
@@ -25,7 +26,7 @@ class ReplayBuffer:
     def push(self, *args):
         '''Given the state, action, reward, next_state, loss (in that order), the queues are updated
         '''
-        self.memory.append(Transition(*args[:-1]))
+        self.transition_memory.append(Transition(*args[:-1]))
         self.loss_memory.append(args[-1])
         
     def sample(self, batch_size, experience=True):
@@ -38,12 +39,15 @@ class ReplayBuffer:
         Returns:
             - (dict): a batch of transitions sampled according to the experience input. It contains the sampled states, actions and rewards in tensor form. It also has a non_final_mask which tells which of the sampled transitions have non terminal next states. Accordingly, all the non terminal next states are given in order.
         '''
-        
+        # if number of samples stored are less than batch_size, skip this function
+        if len(self.transition_memory) < batch_size:
+            return None
         # first create a probability distribution using the loss memory. None in the case when experience is False
         if experience:
-            probs = softmax(self.loss_memory)
+            probs = softmax(np.array(self.loss_memory).squeeze())
         else:
             probs = None
+            
         # then usng this probability, sample the indices from the transition memory
         batch_indices = np.random.choice(range(len(self.transition_memory)), size=batch_size, replace=False, p=probs)
         # create the batch using the indices
@@ -55,20 +59,22 @@ class ReplayBuffer:
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
+        log_prob_batch = torch.cat(batch.log_probability)
         # mask which indicated non terminal next state is obtained
         non_final_mask = torch.tensor(
             tuple(map(lambda s: s is not None, batch.next_state)),
             dtype=torch.bool,
         )
-        # non terminal next states are obtained in order
-        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
+        # next states are obtained in order
+        next_states = torch.cat([s if s is not None else torch.zeros_like(state_batch[0]).unsqueeze(0) for s in batch.next_state])
         
         
         return {
-            "state_batch": state_batch,
-            "action_batch": action_batch,
-            "reward_batch": reward_batch,
-            "non_final_next_states": non_final_next_states,
+            "states": state_batch,
+            "actions": action_batch,
+            "rewards": reward_batch,
+            "log_probabilities": log_prob_batch,
+            "next_states": next_states,
             "non_final_mask": non_final_mask
         }
     
@@ -81,4 +87,26 @@ class ReplayBuffer:
         return len(self.transition_memory)
         
         
+if __name__ == "__main__":
+    rb = ReplayBuffer(capacity=16)
+    batch = None
+    
+    for i in tqdm(range(64)):
+        state = torch.ones((3, 10, 10))
+        action = 1
+        log_prob = torch.tensor([-1])
+        loss = np.random.rand(1)
+        next_state = torch.ones((3, 10, 10))
+        reward = torch.tensor([1])
         
+        rb.push(state.unsqueeze(0), torch.tensor([action]), reward.unsqueeze(0), next_state.unsqueeze(0), log_prob.unsqueeze(0), loss)
+        
+        batch = rb.sample(4)
+        
+    print(batch['states'].shape)
+    print(batch["states"].shape)
+    print(batch["actions"].shape)
+    print(batch["rewards"].shape)
+    print(batch["log_probabilities"].shape)
+    print(batch["next_states"].shape)
+    print(batch["non_final_mask"].shape)
