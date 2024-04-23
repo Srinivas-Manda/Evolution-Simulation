@@ -167,12 +167,27 @@ class CustomEnvironment(ParallelEnv):
         # 2. Check if any pellets were consumed, set them as inactive 
         # 3. Update observations for agents
         # 4. Assign rewards
-        terminations = {a.id : False for a in self.agents_objects}
+        terminations = {a.id : False for a in self.possible_agents_objects}
         rewards = {a.id : 0 for a in self.agents_objects}
-        truncations = None
+        truncations = {a.id : False for a in self.agents_objects}
         observations = None
         infos = None
-        for i, agent in enumerate(self.agents_objects):
+        
+        allDead = True
+        for agent in self.agents_objects:
+            if agent.active == True:
+                allDead = False
+                break
+        
+        if(allDead):
+            rewards = {a.id : 0 for a in self.agents_objects}
+            terminations = {a.id : True for a in self.agents_objects}
+            self.agents_objects = []
+            self.agents = []
+            self.pellets = []
+            return observations, rewards, terminations, truncations, infos
+            
+        for agent in self.agents_objects:
             #move agent
             #skip dead agents
             if(agent.state == "dead" or agent.active == False): 
@@ -197,10 +212,12 @@ class CustomEnvironment(ParallelEnv):
                 agent.pos_y += agent.movement_speed
 
             #check for pellet consumption and assign reward
-            for i, pellet in enumerate(self.pellets):
+            for pellet in self.pellets:
                 if(self.get_entity_collision(agent, pellet) and pellet.active):
-                    self.pellets.pop(i)
-                    # pellet.active = False
+                    for i in range(len(self.pellets)):
+                        if(self.pellets[i].pellet_id == pellet.pellet_id):
+                            self.pellets.pop(k)
+                            break
                     agent.stamina += self.pellet_stamina_gain
                     agent.reward += self.pellet_collect_reward
                     rewards[agent.id] = self.pellet_collect_reward
@@ -209,21 +226,29 @@ class CustomEnvironment(ParallelEnv):
                     agent.reward -= self.move_penalty
                     rewards[agent.id] = self.move_penalty
 
+            #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
-                # agent.state = "dead"
-                # agent.active = False
+                # for i in range(len(self.agents_objects)):
+                #     if(agent.id == self.agents_objects[i].id):
+                #         self.agents_objects.pop(i)
+                #         self.agents.pop(i)
+                #         break
+                agent.state = "dead"
+                agent.active = False
                 terminations[agent.id] = True
-                self.agents_objects.remove(i)
+                # self.agents_objects.remove(i)
 
         #update observation
         observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
 
         # Check truncation conditions (overwrites termination conditions)
-        truncations = {a.id : False for a in self.agents_objects}
+        
         if(self.timestep) > 500:
             rewards = {a.id : 0 for a in self.agents_objects}
             truncations = {a.id : True for a in self.agents_objects}
             self.agents_objects = []
+            self.agents = []
+            self.pellets = []
         self.timestep += 1
 
         # Get dummy infos (not used in this example)
@@ -362,7 +387,7 @@ class CustomEnvironment(ParallelEnv):
         
     # closes the rendering window
     def close(self):
-        self.env.close()
+        # self.env.close()
         pygame.quit()
 
     #returns the state
