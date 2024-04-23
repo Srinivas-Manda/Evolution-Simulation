@@ -1,5 +1,5 @@
 {
- "num_pellets" : 3,
+ "num_pellets" : 50,
  "agents" : ["DQN","AC","SAC"],
  "num_agents" : 3,
 

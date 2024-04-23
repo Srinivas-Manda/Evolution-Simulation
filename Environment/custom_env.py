@@ -41,7 +41,6 @@ class Agent(Entity):
         self.name = name
         self.reward = 0
         self.active = True
-        self.state = "alive"
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
@@ -85,7 +84,6 @@ class CustomEnvironment(ParallelEnv):
 
         #initial number of pellets and agent's starting stamina  
         self.num_pellets = env_config["num_pellets"]
-        # self.num_agents = env_config["num_agents"]
         self.agents_starting_stamina = env_config['stamina']
 
         #grid sizes
@@ -131,9 +129,12 @@ class CustomEnvironment(ParallelEnv):
         self.pellets = copy(self.possible_pellets)
         for a in self.agents_objects:
             a.stamina = self.agents_starting_stamina
+            a.active = True
 
         self.init_pos() # initialise the positions of all agents and all the pellets
-        print(self.agents_objects)
+        # print(self.agents_objects)
+        # for a in self.agents_objects:
+        #     print(a.stamina)
 
         self.timestep = 0
 
@@ -145,10 +146,16 @@ class CustomEnvironment(ParallelEnv):
         #havent thought up of necessary infos
         self.infos = {a.id : {} for a in self.agents_objects}
 
+
+        #DEBUG
+        # print(self.move_stamina_loss)
+        # for a in self.agents_objects:
+        #     print(a.active)
+
         return self.observation_spaces, self.infos
         
     def step(self, actions):
-        # print("step")
+        # print(self.timestep)
         """Takes in an action for the current agent (specified by agent_selection).
 
         Needs to update:
@@ -187,10 +194,11 @@ class CustomEnvironment(ParallelEnv):
             self.pellets = []
             return observations, rewards, terminations, truncations, infos
             
-        for agent in self.agents_objects:
+        for id,agent in enumerate(self.agents_objects):
+            # print(str(agent.id) + ": " + str(agent.stamina))
             #move agent
             #skip dead agents
-            if(agent.state == "dead" or agent.active == False): 
+            if(agent.active == False): 
                 terminations[agent.id] = True
                 rewards[agent.id] = 0
                 continue
@@ -198,51 +206,70 @@ class CustomEnvironment(ParallelEnv):
             action = actions[agent.id]
             
             #YAAD SE APPLY WORLD LIMIT
-            #move left
-            if(action == 0 and agent.pos_x > 0):
-                agent.pos_x -= agent.movement_speed
-            #move right
-            elif(action == 2 and agent.pos_x < self.grid_size_x):
-                agent.pos_x += agent.movement_speed
-            #move up
-            elif(action == 1 and agent.pos_y > 0):
-                agent.pos_y -= agent.movement_speed
-            #move down
-            elif(action == 3 and agent.pos_y < self.grid_size_y):
-                agent.pos_y += agent.movement_speed
+            move_x = np.cos(np.deg2rad(action))
+            move_y = np.sin(np.deg2rad(action))
+            move_x = np.sqrt(agent.movement_speed) * move_x
+            move_y = np.sqrt(agent.movement_speed) * move_y
+            agent.pos_x += move_x
+            agent.pos_y += move_y
+
+            #apply world limits here
+            # X limits
+            if(agent.pos_x < 0):
+                agent.pos_x = 0
+            elif(agent.pos_x >= self.grid_size_x):
+                agent.pos_x = self.grid_size_x
+            # Y limits
+            if(agent.pos_y < 0):
+                agent.pos_y = 0
+            elif(agent.pos_y >= self.grid_size_y):
+                agent.pos_y = self.grid_size_y
+            
 
             #check for pellet consumption and assign reward
+            flagPelletConsumed = False
             for pellet in self.pellets:
-                if(self.get_entity_collision(agent, pellet) and pellet.active):
+                if(self.get_entity_collision(agent, pellet)):
+                    print("agent" + str(agent.id) + " consumed pellet" + str(pellet.pellet_id))
                     for i in range(len(self.pellets)):
                         if(self.pellets[i].pellet_id == pellet.pellet_id):
-                            self.pellets.pop(k)
+                            self.pellets.pop(i)
                             break
-                    agent.stamina += self.pellet_stamina_gain
-                    agent.reward += self.pellet_collect_reward
-                    rewards[agent.id] = self.pellet_collect_reward
-                else:
-                    agent.stamina -= self.move_stamina_loss
-                    agent.reward -= self.move_penalty
-                    rewards[agent.id] = self.move_penalty
+                    flagPelletConsumed = True
+                    break
+            
+            if(flagPelletConsumed == False):
+                agent.stamina -= self.move_stamina_loss
+                agent.reward -= self.move_penalty
+                rewards[agent.id] = self.move_penalty
+            else:
+                agent.stamina += self.pellet_stamina_gain
+                agent.reward += self.pellet_collect_reward
+                rewards[agent.id] = self.pellet_collect_reward
+                
+
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
+                print("agent" + str(agent.id) + " died at time " + str(self.timestep))
                 # for i in range(len(self.agents_objects)):
                 #     if(agent.id == self.agents_objects[i].id):
                 #         self.agents_objects.pop(i)
                 #         self.agents.pop(i)
                 #         break
-                agent.state = "dead"
                 agent.active = False
                 terminations[agent.id] = True
-                # self.agents_objects.remove(i)
-
+                for a in self.agents_objects:
+                    if(a.id == agent.id):
+                        self.agents_objects.remove(a)
+                for a in self.agents:
+                    if(a == agent.id):
+                        self.agents.remove(a)
+                
         #update observation
         observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
 
         # Check truncation conditions (overwrites termination conditions)
-        
         if(self.timestep) > 500:
             rewards = {a.id : 0 for a in self.agents_objects}
             truncations = {a.id : True for a in self.agents_objects}
