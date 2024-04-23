@@ -22,7 +22,6 @@ class Actor(nn.Module):
             config: dict - all important hyperparameters for the model
         '''
         
-        self.device = config['device']       
         
         self.conv_block = nn.Sequential(
             nn.Conv2d(in_channels=config['num_channels'], out_channels=8, kernel_size=1, padding=0),
@@ -41,15 +40,12 @@ class Actor(nn.Module):
             nn.Linear(in_features=32, out_features=config['num_actions'])
         )
         
-    def forward(self, state):
+    def forward(self, observation):
         '''
         Args:
             observation: torch.tensor - observation space, a 3 channel image denoting - agent positions, pellet positions, illegal area
         '''
-        if len(state.shape) == 3:
-            state = state.unsqueeze(0)
-                    
-        feature_map = self.conv_block(state)
+        feature_map = self.conv_block(observation)
         x = self.avg_pool(feature_map)
         probs = F.softmax(self.mlp_block(x.flatten(-3)), dim=-1)
         
@@ -64,9 +60,7 @@ class Critic(nn.Module):
             config: dict - all important hyperparameters for the model
         '''
         super().__init__()
-
-        self.device = config['device']       
-       
+        
         self.conv_block = nn.Sequential(
             nn.Conv2d(in_channels=config['num_channels'], out_channels=8, kernel_size=1, padding=0),
             # nn.Dropout(p=0.3),
@@ -85,9 +79,6 @@ class Critic(nn.Module):
         )
         
     def forward(self, state):
-        if len(state.shape) == 3:
-            state = state.unsqueeze(0)
-        
         feature_map = self.conv_block(state)
         x = self.avg_pool(feature_map)
         state_val = self.mlp_block(x.flatten(-3))
@@ -103,7 +94,7 @@ class ActorCritic(RLAgent):
             - actor - nn.Module: The Actor / Policy Network
             - critic - nn.Module: The Critic / Value Network
         '''
-        super().__init__(config)
+        super()
         
         self.actor = Actor(config)
         self.critic = Critic(config)
@@ -142,30 +133,24 @@ class ActorCritic(RLAgent):
     def push_to_buffer(self, *args):
         '''Given the state, action, reward, next_state, log probability, done (in that order), the buffer is updated after calculating the loss
         '''
-        
-        # return None
         state, action, reward, next_state, log_prob, done = args
         
-        next_state = None if done else next_state.unsqueeze(0)
-        
-        self.replay_buffer.push(state.unsqueeze(0), torch.tensor([action]), reward.unsqueeze(0), next_state, log_prob.unsqueeze(0), 1)
-        
-        # # get the state value
-        # state_value = self.critic(state).to('cpu')
+        # get the state value
+        state_value = self.critic(state).to('cpu')
 
-        # # if the next state is terminal, set value to zero
-        # if done:
-        #     next_state_value = torch.tensor([0]).float().unsqueeze(0).to('cpu')
-        # # else get the next state value
-        # else:
-        #     next_state_value = self.critic(next_state).to('cpu')
+        # if the next state is terminal, set value to zero
+        if done:
+            next_state_value = torch.tensor([0]).float().unsqueeze(0).to('cpu')
+        # else get the next state value
+        else:
+            next_state_value = self.critic(next_state).to('cpu')
             
-        # # calculate the advantage and the loss
-        # advantage = reward + self.discount_factor * next_state_value.item() - state_value.item()
-        # loss = -log_prob * advantage
+        # calculate the advantage and the loss
+        advantage = reward + self.discount_factor * next_state_value.item() - state_value.item()
+        loss = -log_prob * advantage
         
-        # # push the transition and the loss to the buffer
-        # self.replay_buffer.push(state.cpu(), action.cpu(), reward.cpu(), next_state.cpu(), log_prob.cpu(), loss)
+        # push the transition and the loss to the buffer
+        self.replay_buffer.push(state.cpu(), action.cpu(), reward.cpu(), next_state.cpu(), log_prob.cpu(), loss)
         
         
         
@@ -185,16 +170,8 @@ class ActorCritic(RLAgent):
         # - Use batches for weight update according to the ref code
         # - Create RL Agent superclass and move buffer and action selection related tasks there
         
+        batch = self.replay_buffer.sample(self.batch_size)
         
-        batch = self.replay_buffer.sample(self.batch_size, experience=False)
-        
-        # print(batch['states'].shape)
-        # print(batch['actions'])
-        # print(batch['rewards'].shape)
-        # print(batch['log_probabilities'].shape)
-        # print(batch['non_final_next_states'].shape)
-        # print(batch['non_final_mask'])
-        # print()
         if batch is None:
             return
         
@@ -203,15 +180,13 @@ class ActorCritic(RLAgent):
         next_state_values = torch.zeros(self.batch_size, device=self.actor.device)
         
         with torch.no_grad():
-            next_state_values_temp = self.critic(batch["next_states"][batch["non_final_mask"]])
-            
-            next_state_values[batch["non_final_mask"]] = next_state_values_temp if next_state_values_temp.shape[0] != 0 else 0
-                
-            
+            next_state_values[batch["non_final_mask"]] = (
+                self.critic(batch["non_final_next_states"]).max(1).values
+            )
         
         # calculate actor loss
         advantage = batch["rewards"] + self.discount_factor * next_state_values - state_values
-        actor_loss = - batch['log_probabilities'] * advantage
+        actor_loss = - batch['log_probabilites'] * advantage
         
         # actor weight updates
         self.actor_optimiser.zero_grad()
@@ -226,26 +201,22 @@ class ActorCritic(RLAgent):
         critic_loss.backward()
         self.critic_optimiser.step()
         
-        return
 if __name__ == "__main__":
     config = {
         "num_channels": 3,
         "num_actions": 360,
         "actor_step_size": 1e-6,
         "critic_step_size": 1e-3,
-        "batch_size": 1,
-        "discount_factor": 0.9,
-        "capacity": 1,
-        "device": 'cpu'
+        "batch_size": 4,
+        "discount_factor": 0.9
     }
-    
     
     ac_agent = ActorCritic(config=config)
 
     # will be available from previous step/initialisation
     state = torch.ones((3, 10, 10))
     
-    for i in tqdm(range(60)):
+    for i in tqdm(range(6)):
         # will be taken by agent
         action, log_prob = ac_agent.select_action(state=state)
         
@@ -257,11 +228,6 @@ if __name__ == "__main__":
         ac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
         
         ac_agent.update_weights()
-        
-        state = next_state
-        
-        if done:
-            break
     
     
         
