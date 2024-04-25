@@ -38,8 +38,11 @@ class RLAgent:
         raise NotImplementedError("push_to_buffer is not implemented")
         
     def select_action(self, state):
-        raise NotImplementedError("Select action function not implemented")
+        raise NotImplementedError("select_action is not implemented")
         
+    def update_weights(self):
+        raise NotImplementedError("update_weights is not implemented")    
+    
     def sample_from_buffer(self, batch_size, experience=True):
         '''Sample batch_size number of transitions from the replay buffer
         

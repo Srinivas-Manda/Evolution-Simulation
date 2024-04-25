@@ -116,33 +116,23 @@ class SoftActorCritic(RLAgent):
         # the exploration probability distribution, entropies and the mean distribution
         probs, _, _ = self.actor_policy_net.sample(state)
         
-        return torch.argmax(probs, dim=-1), torch.max(probs, dim=-1)
+        return torch.argmax(probs, dim=-1), probs[:, torch.argmax(probs, dim=-1)]
     
     def calc_current_q(self, states):
         curr_q1 = self.critic_q_net(states)
-        return curr_q1
+        return F.gumbel_softmax(curr_q1)
 
     def calc_target_q(self, rewards, next_states, dones):
         with torch.no_grad():
-            next_actions, next_entropies, _ = self.actor_policy_net.sample(next_states)
+            _, next_entropies, _ = self.actor_policy_net.sample(next_states)
             
-            print(next_entropies.shape)
-            # get the indices of the selected actions
-            next_action_ind = torch.tensor([[False for i in range(self.num_actions)] for i in range(next_states.shape[0])])
-            for i, inds in enumerate(next_action_ind):
-                print(next_actions.shape)
-                inds[next_actions[:, i]] = True
-                next_action_ind[i] = inds
-                
-            print(next_action_ind.dtype)
-            print(next_action_ind.shape)
-                
-            next_q = self.critic_q_target_net(next_states)[next_action_ind]
+            next_q = self.critic_q_target_net(next_states)
+            # print(next_q.shape)
             next_q += self.alpha * next_entropies
 
-        target_q = rewards + (1.0 - dones) * self.gamma_n * next_q
+        target_q = rewards + (1.0 - dones) * self.discount_factor * next_q
 
-        return target_q
+        return F.gumbel_softmax(target_q)
     
     def push_to_buffer(self, *args):
         '''Given the state, action, reward, next_state, log probability, done (in that order), the buffer is updated after calculating the loss
@@ -150,11 +140,20 @@ class SoftActorCritic(RLAgent):
         state, action, reward, next_state, log_prob, done = args
         
         current_q = self.calc_current_q(state)
-        print(current_q.shape)
         target_q = self.calc_target_q(rewards=reward, next_states=next_state, dones=done)
         
-        print(target_q.shape)
+        loss = F.kl_div(input=current_q, target=target_q, reduction='batchmean').item()
         
+        # print(state.unsqueeze(0).shape)
+        # print(action.shape)
+        # print(reward.unsqueeze(0).shape)
+        # print(next_state.unsqueeze(0).shape)
+        # print(log_prob.shape)
+        # print(loss)
+        
+        self.replay_buffer.push(state.unsqueeze(0), action.shape, reward.unsqueeze(0), next_state.unsqueeze(0), log_prob, -loss)
+        
+    
         
 if __name__ == '__main__':
     config = {
@@ -186,11 +185,14 @@ if __name__ == '__main__':
     
     next_actions, entropies, det_next_actions = sac_agent.actor_policy_net.sample(state=state)
     
-    print(next_actions.shape)
-    print(entropies.shape)
-    print(det_next_actions.shape)
+    # print(next_actions.shape)
+    # print(entropies.shape)
+    # print(det_next_actions.shape)
     
-    # sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
+    # state = torch.ones((2, 3, 10, 10))
+    
+    
+    sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
     
     
     
