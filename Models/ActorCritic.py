@@ -9,9 +9,15 @@ from tqdm import tqdm
 import numpy as np
 from collections import deque
 
-from ReplayBuffer import ReplayBuffer, Transition
-from RLAgent import RLAgent
-from BasicNetworks import create_linear_network, create_convolutional_network
+# from BasicNetworks.RLAgent import RLAgent
+# from BasicNetworks.BasicNetworks import create_convolutional_network, create_linear_network
+
+if __name__ == '__main__':
+    from RLAgent import RLAgent
+    from BasicNetworks import create_convolutional_network, create_linear_network
+else:
+    from Models.RLAgent import RLAgent
+    from Models.BasicNetworks import create_convolutional_network, create_linear_network
 
 # Policy Network / Actor
 class Actor(nn.Module):

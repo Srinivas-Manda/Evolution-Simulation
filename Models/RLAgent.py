@@ -9,14 +9,22 @@ from tqdm import tqdm_notebook
 import numpy as np
 from collections import deque
 
-from ReplayBuffer import ReplayBuffer, Transition
+if __name__ == 'RLAgent':
+    from ReplayBuffer import ReplayBuffer
+elif __name__ == 'ActorCritic':
+    from ReplayBuffer import ReplayBuffer
+
+# if __name__ == '__main__':
+#     from ReplayBuffer import ReplayBuffer
+# else:
+#     from .ReplayBuffer import ReplayBuffer
 
 # parent class to all the rl agents
 # implements common functionality like buffer related tasks
 class RLAgent:
     
     def __init__(self, config):
-        self.replay_buffer = ReplayBuffer(config['capacity'])
+        self.replay_buffer = ReplayBuffer.ReplayBuffer(config['capacity'])
         self.batch_size = config["batch_size"]
         self.discount_factor = config["discount_factor"]
         self.num_actions = config['num_actions']
