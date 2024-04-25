@@ -19,6 +19,8 @@ class RLAgent:
         self.replay_buffer = ReplayBuffer(config['capacity'])
         self.batch_size = config["batch_size"]
         self.discount_factor = config["discount_factor"]
+        self.num_actions = config['num_actions']
+        self.device = config['device']
                 
                 
     def push_to_buffer(self, *args):
@@ -26,7 +28,7 @@ class RLAgent:
         '''
         raise NotImplementedError("push_to_buffer is not implemented")
         
-    def select_action(self, action):
+    def select_action(self, state):
         raise NotImplementedError("Select action function not implemented")
         
     def sample_from_buffer(self, batch_size, experience=True):

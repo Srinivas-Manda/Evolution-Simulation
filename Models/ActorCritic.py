@@ -11,6 +11,7 @@ from collections import deque
 
 from ReplayBuffer import ReplayBuffer, Transition
 from RLAgent import RLAgent
+from BasicNetworks import create_linear_network, create_convolutional_network
 
 # Policy Network / Actor
 class Actor(nn.Module):
@@ -22,24 +23,19 @@ class Actor(nn.Module):
             config: dict - all important hyperparameters for the model
         '''
         
-        self.device = config['device']       
+        self.device = config['device']    
         
-        self.conv_block = nn.Sequential(
-            nn.Conv2d(in_channels=config['num_channels'], out_channels=8, kernel_size=1, padding=0),
-            # nn.Dropout(p=0.3),
-            nn.BatchNorm2d(num_features=8),
-            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1),
-            # nn.Dropout(p=0.3),
-            nn.BatchNorm2d(num_features=16),
-        )
+        self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
         
-        self.avg_pool = nn.AdaptiveMaxPool2d(1)
+        # self.feature_extractor = CNN(config=config)
         
-        self.mlp_block = nn.Sequential(
-            nn.Linear(in_features=16, out_features=32),
-            # nn.Dropout(p=0.3),
-            nn.Linear(in_features=32, out_features=config['num_actions'])
-        )
+        self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
+        
+        # self.mlp_block = nn.Sequential(
+        #     nn.Linear(in_features=16, out_features=32),
+        #     # nn.Dropout(p=0.3),
+        #     nn.Linear(in_features=32, out_features=config['num_actions'])
+        # )
         
     def forward(self, state):
         '''
@@ -49,9 +45,8 @@ class Actor(nn.Module):
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
                     
-        feature_map = self.conv_block(state)
-        x = self.avg_pool(feature_map)
-        probs = F.softmax(self.mlp_block(x.flatten(-3)), dim=-1)
+        feature_map = self.feature_extractor(state)
+        probs = F.gumbel_softmax(self.mlp_block(feature_map.flatten(-3)), dim=-1)
         
         return probs
     
@@ -65,32 +60,28 @@ class Critic(nn.Module):
         '''
         super().__init__()
 
-        self.device = config['device']       
+        self.device = config['device']
+        
+        self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
+        
+        # self.feature_extractor = CNN(config=config)
+        
+        self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=1, hidden_dims=config['hidden_dims'])
+        
+        # self.feature_extractor = CNN(config=config)   
        
-        self.conv_block = nn.Sequential(
-            nn.Conv2d(in_channels=config['num_channels'], out_channels=8, kernel_size=1, padding=0),
-            # nn.Dropout(p=0.3),
-            nn.BatchNorm2d(num_features=8),
-            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1),
-            # nn.Dropout(p=0.3),
-            nn.BatchNorm2d(num_features=16),
-        )
-        
-        self.avg_pool = nn.AdaptiveMaxPool2d(1)
-        
-        self.mlp_block = nn.Sequential(
-            nn.Linear(in_features=16, out_features=32),
-            # nn.Dropout(p=0.3),
-            nn.Linear(in_features=32, out_features=1)
-        )
+        # self.mlp_block = nn.Sequential(
+        #     nn.Linear(in_features=16, out_features=32),
+        #     # nn.Dropout(p=0.3),
+        #     nn.Linear(in_features=32, out_features=1)
+        # )
         
     def forward(self, state):
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
         
-        feature_map = self.conv_block(state)
-        x = self.avg_pool(feature_map)
-        state_val = self.mlp_block(x.flatten(-3))
+        feature_map = self.feature_extractor(state)
+        state_val = self.mlp_block(feature_map.flatten(-3))
         
         return state_val
         
@@ -200,13 +191,12 @@ class ActorCritic(RLAgent):
         
         state_values = self.critic(batch['states'])
         
-        next_state_values = torch.zeros(self.batch_size, device=self.actor.device)
+        next_state_values = torch.zeros(self.batch_size, device=self.device)
         
         with torch.no_grad():
             next_state_values_temp = self.critic(batch["next_states"][batch["non_final_mask"]])
             
-            next_state_values[batch["non_final_mask"]] = next_state_values_temp if next_state_values_temp.shape[0] != 0 else 0
-                
+            next_state_values[batch["non_final_mask"]] = next_state_values_temp if next_state_values_temp.shape[0] != 0 else 0       
             
         
         # calculate actor loss
@@ -229,7 +219,10 @@ class ActorCritic(RLAgent):
         return
 if __name__ == "__main__":
     config = {
-        "num_channels": 3,
+        "in_channels": 3,
+        "out_channels": 32,
+        "hidden_channels": [8, 16],
+        "hidden_dims": [32],
         "num_actions": 360,
         "actor_step_size": 1e-6,
         "critic_step_size": 1e-3,
@@ -238,7 +231,6 @@ if __name__ == "__main__":
         "capacity": 1,
         "device": 'cpu'
     }
-    
     
     ac_agent = ActorCritic(config=config)
 
@@ -252,7 +244,7 @@ if __name__ == "__main__":
         # will be available from the environment
         next_state = torch.ones_like(state)
         reward = torch.tensor([1])
-        done = False if np.random.rand(1)[0] <= 0.9 else True
+        done = False if np.random.rand(1)[0] <= 0.95 else True
         
         ac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
         
