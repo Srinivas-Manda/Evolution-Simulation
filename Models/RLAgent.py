@@ -9,7 +9,7 @@ from tqdm import tqdm_notebook
 import numpy as np
 from collections import deque
 
-from Models.ReplayBuffer import ReplayBuffer, Transition
+from ReplayBuffer import ReplayBuffer, Transition
 
 # parent class to all the rl agents
 # implements common functionality like buffer related tasks
