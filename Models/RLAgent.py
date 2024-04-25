@@ -13,7 +13,8 @@ if __name__ == 'RLAgent':
     from ReplayBuffer import ReplayBuffer
 elif __name__ == 'ActorCritic':
     from ReplayBuffer import ReplayBuffer
-
+else:
+    from Models.ReplayBuffer import ReplayBuffer
 # if __name__ == '__main__':
 #     from ReplayBuffer import ReplayBuffer
 # else:
