@@ -145,43 +145,22 @@ class ActorCritic(RLAgent):
         
         next_state = None if done else next_state.unsqueeze(0)
         
-        self.replay_buffer.push(state.unsqueeze(0), torch.tensor([action]), reward.unsqueeze(0), next_state, log_prob.unsqueeze(0), 1)
-        
-        # # get the state value
-        # state_value = self.critic(state).to('cpu')
-
-        # # if the next state is terminal, set value to zero
-        # if done:
-        #     next_state_value = torch.tensor([0]).float().unsqueeze(0).to('cpu')
-        # # else get the next state value
-        # else:
-        #     next_state_value = self.critic(next_state).to('cpu')
-            
-        # # calculate the advantage and the loss
-        # advantage = reward + self.discount_factor * next_state_value.item() - state_value.item()
-        # loss = -log_prob * advantage
-        
-        # # push the transition and the loss to the buffer
-        # self.replay_buffer.push(state.cpu(), action.cpu(), reward.cpu(), next_state.cpu(), log_prob.cpu(), loss)
-        
+        self.replay_buffer.push(state.unsqueeze(0), torch.tensor([action]).unsqueeze(0), reward.unsqueeze(0), next_state, log_prob.unsqueeze(0), 1)
         
         
     def update_weights(self) -> None:
         '''This function updates the weights of the actor and the critic network based on the given state, action, reward and next_state
-        
-        Args:
-            - state - torch.tensor: The state of the environment given as the input
-            - action - torch.tensor: The action selected using the Actor
-            - reward - torch.tensor: The reward given by the environment
-            - next_state - torch.tensor: The next_state given by the environment
-            - done - torch.tensor: tensor which tells if the next state is terminal or not
         '''
         
-        # TODO: Change this part from the ref file.
-        # - Add replay buffer object to ActorCritic
-        # - Use batches for weight update according to the ref code
-        # - Create RL Agent superclass and move buffer and action selection related tasks there
-        
+        '''
+        Batch:
+            - states - torch.tensor: The state of the environment given as the input
+            - actions - torch.tensor: The action selected using the Actor
+            - rewards - torch.tensor: The reward given by the environment
+            - log_probabilities - torch.tensor: The log probabilities as calculated during action selection
+            - next_states - torch.tensor: The next_state given by the environment
+            - non_final_mask - torch.tensor: tensor of the same size as the next_states which tells if the next state is terminal or not
+        '''
         
         batch = self.replay_buffer.sample(self.batch_size, experience=False)
         
