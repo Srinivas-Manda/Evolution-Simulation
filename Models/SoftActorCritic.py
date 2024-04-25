@@ -22,24 +22,36 @@ class QNetwork(nn.Module):
         
         self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
         
+    def forward(self, state):
+        if len(state.shape) == 3:
+            state = state.unsqueeze(0)
+        
+        x = self.feature_extractor(state)
+
+        x = self.mlp_block(x.flatten(-3))
+        
+        return x
+        
 # Actor Network
 class GaussianPolicy(nn.Module):
     def __init__(self, config):
-        super().__init__(self)
+        super().__init__()
         
         self.log_std_min = config['log_std_min']
         self.log_std_max = config['log_std_max']
         self.eps = config['epsilon']
         
-        self.policy_conv = create_convolutional_network(input_dim=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
+        self.policy_conv = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
         
         # first half of output is mean, the second is log_std
         self.policy_lin = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions']*2, hidden_dims=config['hidden_dims'])
         
         
-        
     # returns the mean and log_std of the gaussian
     def forward(self, state):
+        if len(state.shape) == 3:
+            state = state.unsqueeze(0)
+        
         x = self.policy_conv(state)
 
         x = self.policy_lin(x.flatten(-3))
@@ -80,9 +92,9 @@ class SoftActorCritic(RLAgent):
         self.policy_step_size = config["actor_step_size"]
         self.q_step_size = config["critic_step_size"]
         
-        self.policy_optim = optim.Adam(self.actor_policy_net.parameters, lr=self.policy_step_size)
-        self.q_optim = optim.Adam(self.critic_q_net.parameters, lr=self.q_step_size)
-        self.q_target_optim = optim.Adam(self.critic_q_target_net.parameters, lr=self.q_step_size)
+        self.policy_optim = optim.Adam(self.actor_policy_net.parameters(), lr=self.policy_step_size)
+        self.q_optim = optim.Adam(self.critic_q_net.parameters(), lr=self.q_step_size)
+        self.q_target_optim = optim.Adam(self.critic_q_target_net.parameters(), lr=self.q_step_size)
 
         # entropy related stuff
         # target entropy is -1 * # actions i.e. complete randomness
@@ -99,12 +111,12 @@ class SoftActorCritic(RLAgent):
             state = state.unsqueeze(0)
             
         # the exploration probability distribution, entropies and the mean distribution
-        probs, _, _ = self.actor_policy_net(state)
+        probs, _, _ = self.actor_policy_net.sample(state)
         
         return torch.argmax(probs, dim=-1), torch.max(probs, dim=-1)
     
     def calc_current_q(self, states):
-        curr_q1 = self.critic(states)
+        curr_q1 = self.critic_q_net(states)
         return curr_q1
 
     def calc_target_q(self, rewards, next_states, dones):
@@ -117,7 +129,7 @@ class SoftActorCritic(RLAgent):
                 inds[next_actions[i]] = True
                 next_action_ind[i] = inds
                 
-            next_q = self.critic_target(next_states)[next_action_ind]
+            next_q = self.critic_q_target_net(next_states)[next_action_ind]
             next_q += self.alpha * next_entropies
 
         target_q = rewards + (1.0 - dones) * self.gamma_n * next_q
@@ -128,6 +140,47 @@ class SoftActorCritic(RLAgent):
         '''Given the state, action, reward, next_state, log probability, done (in that order), the buffer is updated after calculating the loss
         '''
         state, action, reward, next_state, log_prob, done = args
+        
+        current_q = self.calc_current_q(state)
+        target_q = self.calc_target_q(rewards=reward, next_states=next_state, dones=done)
+        
+        print(current_q.shape)
+        print(target_q.shape)
+        
+        
+if __name__ == '__main__':
+    config = {
+        "in_channels": 3,
+        "out_channels": 32,
+        "hidden_channels": [8, 16],
+        "hidden_dims": [32],
+        "num_actions": 360,
+        "actor_step_size": 1e-6,
+        "critic_step_size": 1e-3,
+        "batch_size": 1,
+        "discount_factor": 0.9,
+        "capacity": 1,
+        "device": 'cpu',
+        "log_std_min": -2,
+        "log_std_max": 20,
+        "epsilon": 1e-6
+    }
+    
+    sac_agent = SoftActorCritic(config=config)
+    
+    state = torch.ones((3, 10, 10))
+    
+    action, log_prob = sac_agent.select_action(state=state)
+    
+    next_state = torch.ones_like(state)
+    reward = torch.tensor([1])
+    done = False if np.random.rand(1)[0] <= 0.95 else True
+    
+    sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
+    
+    
+    
+
         
         
         
