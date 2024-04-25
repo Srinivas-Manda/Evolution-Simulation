@@ -9,9 +9,12 @@ from tqdm import tqdm
 import numpy as np
 from collections import deque
 
-from ReplayBuffer import ReplayBuffer, Transition
-from RLAgent import RLAgent
-from BasicNetworks import create_convolutional_network, create_linear_network
+if __name__ == '__main__':
+    from RLAgent import RLAgent
+    from BasicNetworks import create_convolutional_network, create_linear_network
+else:
+    from Models.RLAgent import RLAgent
+    from Models.BasicNetworks import create_convolutional_network, create_linear_network
 
 # Critic Networks
 class QNetwork(nn.Module):
@@ -123,11 +126,16 @@ class SoftActorCritic(RLAgent):
         with torch.no_grad():
             next_actions, next_entropies, _ = self.actor_policy_net.sample(next_states)
             
+            print(next_entropies.shape)
             # get the indices of the selected actions
             next_action_ind = torch.tensor([[False for i in range(self.num_actions)] for i in range(next_states.shape[0])])
             for i, inds in enumerate(next_action_ind):
-                inds[next_actions[i]] = True
+                print(next_actions.shape)
+                inds[next_actions[:, i]] = True
                 next_action_ind[i] = inds
+                
+            print(next_action_ind.dtype)
+            print(next_action_ind.shape)
                 
             next_q = self.critic_q_target_net(next_states)[next_action_ind]
             next_q += self.alpha * next_entropies
@@ -142,9 +150,9 @@ class SoftActorCritic(RLAgent):
         state, action, reward, next_state, log_prob, done = args
         
         current_q = self.calc_current_q(state)
+        print(current_q.shape)
         target_q = self.calc_target_q(rewards=reward, next_states=next_state, dones=done)
         
-        print(current_q.shape)
         print(target_q.shape)
         
         
@@ -176,7 +184,13 @@ if __name__ == '__main__':
     reward = torch.tensor([1])
     done = False if np.random.rand(1)[0] <= 0.95 else True
     
-    sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
+    next_actions, entropies, det_next_actions = sac_agent.actor_policy_net.sample(state=state)
+    
+    print(next_actions.shape)
+    print(entropies.shape)
+    print(det_next_actions.shape)
+    
+    # sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
     
     
     
