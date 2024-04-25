@@ -1,13 +1,13 @@
 {
- "num_pellets" : 50,
+ "num_pellets" : 100,
  "agents" : ["DQN","AC","SAC"],
  "num_agents" : 3,
 
- "default_vision" : 3,
+ "default_vision" : 8,
  "default_movement_speed" : 0.5,
  "default_strength" : 10,
  "stamina" : 100,
- "max_vision" : 8,
+ "max_vision" : 12,
  "max_movement_speed" : 0.5,
  "max_strength" : 20,
  

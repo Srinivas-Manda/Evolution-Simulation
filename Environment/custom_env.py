@@ -333,6 +333,7 @@ class CustomEnvironment(ParallelEnv):
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
 
     #check for hit of an agent with any entity
+    #if possible make changes by steps or line
     def get_entity_collision(self, agent, entity):
         #create a box centered on the agent of unit length. this is the bounds of the agent
         #based on vision(min = 3) based on this, the agent can see upto 3 boxes around itself(square fasion mai)
