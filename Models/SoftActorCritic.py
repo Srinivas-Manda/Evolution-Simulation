@@ -249,7 +249,7 @@ class SoftActorCritic(RLAgent):
         self.soft_update(self.critic_q_target_net, self.critic_q_net)
         
         # return q_loss.detach(), policy_loss.detach(), entropy_loss.detach()
-        
+        return q_loss.detach().cpu()
         
 if __name__ == '__main__':
 

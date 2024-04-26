@@ -1,18 +1,18 @@
 {
     "in_channels": 3,
-    "out_channels": 32,
-    "hidden_channels": [8, 16],
-    "hidden_dims": [32],
+    "out_channels": 128,
+    "hidden_channels": [32, 64],
+    "hidden_dims": [128],
     "num_actions": 360,
-    "policy_step_size": 1e-3,
-    "batch_size": 4,
-    "discount_factor": 0.9,
-    "capacity": 8,
+    "policy_step_size": 1e-2,
+    "batch_size": 64,
+    "discount_factor": 0.95,
+    "capacity": 10000,
     "device": "cuda",
     "log_std_min": -2,
     "log_std_max": 20,
-    "eps_start": 0.5,
+    "eps_start": 0.9,
     "eps_end": 0.05,
-    "eps_decay": 1000,
-    "tau": 1e-3
+    "eps_decay": 100,
+    "tau": 1e-4
 }

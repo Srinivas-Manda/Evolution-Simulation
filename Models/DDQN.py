@@ -175,6 +175,8 @@ class DoubleDQN(RLAgent):
         
         # update number of steps done
         self.steps_done += 1
+
+        return policy_loss.detach().cpu()
         
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)

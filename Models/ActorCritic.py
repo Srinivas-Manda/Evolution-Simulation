@@ -188,7 +188,8 @@ class ActorCritic(RLAgent):
         
         self.param_step(optim=self.critic_optimiser, network=self.critic, loss=critic_loss)
         
-        return
+        return actor_loss.detach().cpu()
+        
 if __name__ == "__main__":
     config = {
         "in_channels": 3,

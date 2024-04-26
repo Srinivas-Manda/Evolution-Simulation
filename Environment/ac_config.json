@@ -1,13 +1,13 @@
 {
     "in_channels": 3,
-    "out_channels": 32,
-    "hidden_channels": [8, 16],
-    "hidden_dims": [32],
+    "out_channels": 128,
+    "hidden_channels": [32, 64],
+    "hidden_dims": [128],
     "num_actions": 360,
-    "actor_step_size": 1e-6,
-    "critic_step_size": 1e-3,
+    "actor_step_size": 1e-5,
+    "critic_step_size": 1e-2,
     "batch_size": 1,
-    "discount_factor": 0.9,
+    "discount_factor": 0.95,
     "capacity": 1,
     "device": "cuda"
 }
