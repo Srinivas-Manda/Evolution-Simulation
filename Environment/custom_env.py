@@ -17,6 +17,9 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+PINK = (255,192,203)
+BLUE = (0,0,255)
+AGENT_COLORS = [RED, BLUE, PINK]
 
 ac_config = open('Environment/ac_config.json')
 ac_variables = json.load(ac_config)
@@ -231,7 +234,7 @@ class CustomEnvironment(ParallelEnv):
         rewards = {a : 0 for a in self.agents}
         truncations = {a : False for a in self.agents}
         observations = {a : None for a in self.agents}
-        infos = None
+        infos = {a : None for a in self.agents}
         
         # allDead = True
         # for agent in self.agents_objects:
@@ -331,7 +334,7 @@ class CustomEnvironment(ParallelEnv):
         self.timestep += 1
 
         # Get dummy infos (not used in this example)
-        infos = {id : {} for id,a in self.agents_objects.items()}
+        # infos = {id : {} for id,a in self.agents_objects.items()}
 
         # self.render()
         if(self.render_mode == "human"):
@@ -454,35 +457,32 @@ class CustomEnvironment(ParallelEnv):
         return box
 
     def render(self):
-        agent_pos = [[] for a in self.agents]
-        i = 0
-        for id,agent in self.agents_objects.items():
-            agent_pos[i] = [agent.pos_x, agent.pos_y]
-            i += 1
-
-        # Generate two food positions
-        pellet_pos = [[] for a in self.pellets]
-        i = 0
-        for pellet in self.pellets:
-            pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
-            i += 1
-
+        pygame.event.get()
         self.screen.fill(WHITE)
-        
-        # Draw the player circle (relative to coordinate space position)
-        for pos in agent_pos:
-            screen_pos = [pos[0] * (self.screen_width / self.grid_size_x), pos[1] * (self.screen_height / self.grid_size_y)]
-            pygame.draw.circle(self.screen, RED, screen_pos, 5)
+        if len(self.agents_objects) > 0:
 
-        # Draw the food circles (relative to coordinate space position)
-        for pos in pellet_pos:
-            screen_pos = [pos[0] * (self.screen_width / self.grid_size_x), pos[1] * (self.screen_height / self.grid_size_y)]
-            pygame.draw.circle(self.screen, GREEN, screen_pos, 2)
+            # Generate two food positions
+            pellet_pos = [[] for a in self.pellets]
+            i = 0
+            for pellet in self.pellets:
+                pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
+                i += 1
 
-        # Update the display
+            
+            # Draw the player circle (relative to coordinate space position)
+            for id,agent in self.agents_objects.items():
+                screen_pos = [agent.pos_x * (self.screen_width / self.grid_size_x), agent.pos_y * (self.screen_height / self.grid_size_y)]
+                pygame.draw.circle(self.screen, AGENT_COLORS[id], screen_pos, 5)
+
+            # Draw the food circles (relative to coordinate space position)
+            for pos in pellet_pos:
+                screen_pos = [pos[0] * (self.screen_width / self.grid_size_x), pos[1] * (self.screen_height / self.grid_size_y)]
+                pygame.draw.circle(self.screen, GREEN, screen_pos, 2)
+
+            # Update the display
         pygame.display.flip()
 
-        sleep(0.1)
+        sleep(0.01)
 
 
     # Observation space should be defined here.

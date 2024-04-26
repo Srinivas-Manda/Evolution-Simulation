@@ -7,12 +7,12 @@
     "policy_step_size": 1e-2,
     "batch_size": 64,
     "discount_factor": 0.95,
-    "capacity": 10000,
+    "capacity": 500,
     "device": "cuda",
     "log_std_min": -2,
     "log_std_max": 20,
     "eps_start": 0.9,
     "eps_end": 0.05,
-    "eps_decay": 100,
+    "eps_decay": 10000,
     "tau": 1e-4
 }

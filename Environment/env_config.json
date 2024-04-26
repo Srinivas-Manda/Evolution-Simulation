@@ -1,5 +1,5 @@
 {
- "num_pellets" : 300,
+ "num_pellets" : 400,
  "agents" : ["DDQN","AC","SAC"],
  "num_agents" : 3,
  "num_actions" : 360,
@@ -12,8 +12,8 @@
  "max_movement_speed" : 1,
  "max_strength" : 20,
  
- "grid_size_x" : 100,
- "grid_size_y" : 100,
+ "grid_size_x" : 75,
+ "grid_size_y" : 75,
 
  "screen_width" : 600,
  "screen_height" : 600,

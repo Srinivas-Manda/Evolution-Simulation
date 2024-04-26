@@ -8,7 +8,7 @@
     "critic_step_size": 1e-2,
     "batch_size": 64,
     "discount_factor": 0.95,
-    "capacity": 10000,
+    "capacity": 500,
     "device": "cuda",
     "log_std_min": -2,
     "log_std_max": 20,
