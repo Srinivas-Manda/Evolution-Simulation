@@ -18,15 +18,15 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
-ac_config = open('Models/ac_config.json')
+ac_config = open('Environment/ac_config.json')
 ac_variables = json.load(ac_config)
 ac_config.close
 
-sac_config = open('Models/sac_config.json')
+sac_config = open('Environment/sac_config.json')
 sac_variables = json.load(sac_config)
 sac_config.close
 
-ddqn_config = open('Models/ddqn_config.json')
+ddqn_config = open('Environment/ddqn_config.json')
 ddqn_variables = json.load(ddqn_config)
 ddqn_config.close
 
@@ -63,8 +63,7 @@ class Agent(Entity):
         self.reward = 0
         self.active = True
         self.brain1 = None
-
-        self.set_brain_1()
+        self.set_brain_1(name)
 
     def set_brain_1(self, agent_type):
 
@@ -79,7 +78,6 @@ class Agent(Entity):
 
         else:
             raise(f"{agent_type} is invalid")
-
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
@@ -113,10 +111,14 @@ class CustomEnvironment(ParallelEnv):
         """
         #THESE ATTRIBUTES SHOULD NOT CHANGE AFTER INTIALIZATION
         #temporary agents and pellets list to store names, ids and their respective attributes
-        self.possible_agents_objects = [Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])]
+        self.possible_agents_objects = {id : Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])} #changed this to dict
         self.possible_agents = [i for i in range(len(self.possible_agents_objects))]
         self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
-        for a in self.possible_agents_objects:
+        self.n_agents = env_config["num_agents"]
+        self.num_actions = env_config["num_actions"]
+        self.justdie = None
+
+        for id,a in self.possible_agents_objects.items():
             a.strength = env_config["default_strength"]
             a.vision_size = env_config["default_vision"]
             a.movement_speed = env_config["default_movement_speed"]
@@ -166,10 +168,11 @@ class CustomEnvironment(ParallelEnv):
         self.agents = copy(self.possible_agents) #agent id list
         self.agents_objects = copy(self.possible_agents_objects) #agent object list
         self.pellets = copy(self.possible_pellets)
-        for a in self.agents_objects:
+        for id,a in self.agents_objects.items():
             a.stamina = self.agents_starting_stamina
             a.active = True
 
+        self.justdie = {}
         self.init_pos() # initialise the positions of all agents and all the pellets
         # print(self.agents_objects)
         # for a in self.agents_objects:
@@ -179,11 +182,13 @@ class CustomEnvironment(ParallelEnv):
 
         #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
-          a.id : self.make_observation_space(a) for a in self.agents_objects
+          id : self.make_observation_space(a) for id,a in self.agents_objects.items()
         }
         
         #havent thought up of necessary infos
-        self.infos = {a.id : {} for a in self.agents_objects}
+        self.infos = {
+            id : {} for id,a in self.agents_objects.items()
+        }
 
 
         #DEBUG
@@ -233,7 +238,7 @@ class CustomEnvironment(ParallelEnv):
         #     self.pellets = []
         #     return observations, rewards, terminations, truncations, infos
             
-        for id,agent in enumerate(self.agents_objects):
+        for id,agent in self.agents_objects.items():
             # print(str(agent.id) + ": " + str(agent.stamina))
             #move agent
             #skip dead agents
@@ -242,7 +247,7 @@ class CustomEnvironment(ParallelEnv):
             #     rewards[agent.id] = 0
             #     continue
             
-            action = actions[agent.id]
+            action = actions[id]
             
             #YAAD SE APPLY WORLD LIMIT
             move_x = np.cos(np.deg2rad(action))
@@ -269,7 +274,7 @@ class CustomEnvironment(ParallelEnv):
             flagPelletConsumed = False
             for pellet in self.pellets:
                 if(self.get_entity_collision(agent, pellet)):
-                    print("agent" + str(agent.id) + " consumed pellet" + str(pellet.pellet_id))
+                    print("agent" + str(id) + " consumed pellet" + str(pellet.pellet_id))
                     for i in range(len(self.pellets)):
                         if(self.pellets[i].pellet_id == pellet.pellet_id):
                             self.pellets.pop(i)
@@ -280,23 +285,25 @@ class CustomEnvironment(ParallelEnv):
             if(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
                 agent.reward -= self.move_penalty
-                rewards[agent.id] = self.move_penalty
+                rewards[id] = self.move_penalty
             else:
                 agent.stamina += self.pellet_stamina_gain
                 agent.reward += self.pellet_collect_reward
-                rewards[agent.id] = self.pellet_collect_reward
+                rewards[id] = self.pellet_collect_reward
                 
             #update observation of agent after moving it and before terminating it
-            observations[agent.id] = self.make_observation_space(agent)
+            observations[id] = self.make_observation_space(agent)
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
-                print("agent" + str(agent.id) + " died at time " + str(self.timestep))
+                print("agent" + str(id) + " died at time " + str(self.timestep))
                 agent.active = False
+                self.justdie[id] = agent
                 terminations[agent.id] = True
-                for a in self.agents_objects:
-                    if(a.id == agent.id):
-                        self.agents_objects.remove(a)
+                del self.agents_objects[id]
+                # for id,a in self.agents_objects.items():
+                    # if(a.id == agent.id):
+                        # self.agents_objects.remove(a)
                 for a in self.agents:
                     if(a == agent.id):
                         self.agents.remove(a)
@@ -306,15 +313,15 @@ class CustomEnvironment(ParallelEnv):
 
         # Check truncation conditions (overwrites termination conditions)
         if(self.timestep) > 500:
-            rewards = {a.id : 0 for a in self.agents_objects}
-            truncations = {a.id : True for a in self.agents_objects}
+            rewards = {id : 0 for id,a in self.agents_objects.items()}
+            truncations = {id : True for id,a in self.agents_objects.items()}
             self.agents_objects = []
             self.agents = []
             self.pellets = []
         self.timestep += 1
 
         # Get dummy infos (not used in this example)
-        infos = {a : {} for a in self.agents_objects}
+        infos = {id : {} for id,a in self.agents_objects.items()}
 
         # self.render()
 
@@ -328,7 +335,7 @@ class CustomEnvironment(ParallelEnv):
         pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents_objects), replace= False) # then to pick an x value for all agents
         pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
 
-        for i,agent in enumerate(self.agents_objects): # iterating over all agents
+        for i,id in enumerate(self.agents_objects): # iterating over all agents
             if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
                 x = pos_x[i]
                 y = self.grid_size_y-1 if edge[i]==2 else 0
@@ -337,7 +344,7 @@ class CustomEnvironment(ParallelEnv):
                 y = pos_y[i]
                 x = self.grid_size_x-1 if edge[i]==1 else 0
             
-            agent.update_pos(x,y) # setting the position of agent
+            self.agents_objects[id].update_pos(x,y) # setting the position of agent
 
         points = set() # creating a set for different pellets
 
@@ -398,9 +405,9 @@ class CustomEnvironment(ParallelEnv):
         agent_pos = {}
         pellet_pos = []
 
-        for temp_agent in self.agents_objects:
-            if(temp_agent.id != agent.id):
-                agent_pos[temp_agent.id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
+        for id,temp_agent in self.agents_objects.items():
+            if(id != agent.id):
+                agent_pos[id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
 
         for temp_pellet in self.pellets:
             pellet_pos.append([math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y)])

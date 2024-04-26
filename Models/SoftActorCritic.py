@@ -238,7 +238,9 @@ class SoftActorCritic(RLAgent):
         
         
 if __name__ == '__main__':
+
     torch.autograd.set_detect_anomaly(True)
+    
     config = {
         "in_channels": 3,
         "out_channels": 32,

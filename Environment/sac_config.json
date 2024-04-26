@@ -6,8 +6,12 @@
     "num_actions": 360,
     "actor_step_size": 1e-6,
     "critic_step_size": 1e-3,
-    "batch_size": 1,
+    "batch_size": 4,
     "discount_factor": 0.9,
-    "capacity": 1,
-    "device": "cpu"
+    "capacity": 8,
+    "device": "cuda",
+    "log_std_min": -2,
+    "log_std_max": 20,
+    "epsilon": 1e-6,
+    "tau": 1e-3
 }

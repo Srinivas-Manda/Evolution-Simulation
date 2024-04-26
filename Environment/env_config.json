@@ -1,8 +1,9 @@
 {
  "num_pellets" : 100,
- "agents" : ["DQN","AC","SAC"],
+ "agents" : ["DDQN","AC","SAC"],
  "num_agents" : 3,
-
+ "num_actions" : 360,
+ 
  "default_vision" : 8,
  "default_movement_speed" : 0.5,
  "default_strength" : 10,
