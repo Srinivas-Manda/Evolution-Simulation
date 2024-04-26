@@ -35,6 +35,13 @@ class RLAgent:
             self.grad_clip = None
         else:
             self.grad_clip = config['grad_clip']
+        
+        if not "tau" in config:
+            self.tau = None
+        else:
+            self.tau = config['tau']
+            if self.tau is None:
+                raise("tau cannot be None")
                 
                 
     def push_to_buffer(self, *args):
@@ -47,6 +54,12 @@ class RLAgent:
         
     def update_weights(self):
         raise NotImplementedError("update_weights is not implemented")    
+    
+    # soft target network update
+    def soft_update(self, target, source):
+        for t, s in zip(target.parameters(), source.parameters()):
+            t.data.copy_(t.data * (1.0 - self.tau) + s.data * self.tau)
+    
     
     def param_step(self, optim, network, loss, retain_graph=False):
         optim.zero_grad()

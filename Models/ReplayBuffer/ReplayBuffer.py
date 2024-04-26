@@ -9,7 +9,7 @@ from collections import deque, namedtuple
 from tqdm import tqdm
 
 # The transition that will be stored in the replay buffer
-Transition = namedtuple("Transition", ("state", "action", "reward", "next_state", "log_probability"))
+Transition = namedtuple("Transition", ("state", "action", "reward", "next_state", "done", "log_probability"))
 
 # The replay buffer to sample from
 class ReplayBuffer:
@@ -24,7 +24,7 @@ class ReplayBuffer:
         self.loss_memory = deque([], maxlen=capacity)
         
     def push(self, *args):
-        '''Given the state, action, reward, next_state, loss (in that order), the queues are updated
+        '''Given the state, action, reward, next_state, done, loss (in that order), the queues are updated
         '''
         self.transition_memory.append(Transition(*args[:-1]))
         self.loss_memory.append(args[-1])
@@ -59,10 +59,11 @@ class ReplayBuffer:
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
+        # done_batch = torch.cat(batch.done)
         log_prob_batch = torch.cat(batch.log_probability)
         # mask which indicated non terminal next state is obtained
         non_final_mask = torch.tensor(
-            tuple(map(lambda s: s is not None, batch.next_state)),
+            tuple(map(lambda s: s is not True, batch.done)),
             dtype=torch.bool,
         )
         # next states are obtained in order

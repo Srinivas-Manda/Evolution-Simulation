@@ -100,7 +100,7 @@ class SoftActorCritic(RLAgent):
         
         self.policy_optim = optim.Adam(self.actor_policy_net.parameters(), lr=self.policy_step_size)
         self.q_optim = optim.Adam(self.critic_q_net.parameters(), lr=self.q_step_size)
-        self.q_target_optim = optim.Adam(self.critic_q_target_net.parameters(), lr=self.q_step_size)
+        # self.q_target_optim = optim.Adam(self.critic_q_target_net.parameters(), lr=self.q_step_size)
 
         # entropy related stuff
         # target entropy is -1 * # actions i.e. complete randomness
@@ -111,7 +111,7 @@ class SoftActorCritic(RLAgent):
         # the weight given to entropy while calculating the next state dist
         self.alpha = self.log_alpha.exp()
         self.alpha_optim = optim.Adam([self.log_alpha], lr=self.policy_step_size)
-    
+        
     # gets the current state policy distribution from the current critic q net
     def calc_current_q(self, states, actions):
         curr_q = self.critic_q_net(states, actions)
@@ -192,7 +192,7 @@ class SoftActorCritic(RLAgent):
         loss = torch.abs(target_q - current_q).item()
         
         # push the transition to the buffer
-        self.replay_buffer.push(state.unsqueeze(0), action.unsqueeze(0), reward.unsqueeze(0), next_state.unsqueeze(0), log_prob, loss)
+        self.replay_buffer.push(state.unsqueeze(0), torch.tensor([action]).unsqueeze(0), torch.tensor([reward]).unsqueeze(0), next_state.unsqueeze(0), torch.tensor([done]).unsqueeze(0), log_prob, loss)
     
     def update_weights(self):
         '''This function updates the weights of the actor and the critic network based on the given state, action, reward and next_state
@@ -232,6 +232,8 @@ class SoftActorCritic(RLAgent):
         entropy_loss = self.calc_entropy_loss(entropy)
         self.param_step(optim=self.alpha_optim, network=None, loss=entropy_loss, retain_graph=True)
         
+        self.soft_update(self.critic_q_target_net, self.critic_q_net)
+        
         # return q_loss.detach(), policy_loss.detach(), entropy_loss.detach()
         
         
@@ -252,6 +254,7 @@ if __name__ == '__main__':
         "log_std_min": -2,
         "log_std_max": 20,
         "epsilon": 1e-6,
+        "tau": 1e-3
     }
     
     sac_agent = SoftActorCritic(config=config)
@@ -266,7 +269,7 @@ if __name__ == '__main__':
         
         # will be available from the environment
         next_state = torch.ones_like(state)
-        reward = torch.tensor([1])
+        reward = 1
         done = False if np.random.rand(1)[0] <= 0.999 else True
         
         sac_agent.push_to_buffer(state, action, reward, next_state, log_prob, done)
