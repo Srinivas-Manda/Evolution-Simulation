@@ -10,9 +10,9 @@ from Models.SoftActorCritic import SoftActorCritic
 from Models.DDQN import DoubleDQN
 from pettingzoo import ParallelEnv
 import json
+from time import sleep
 
 # Colors
-# what this nigga
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
@@ -89,7 +89,7 @@ class CustomEnvironment(ParallelEnv):
         "name": "custom_environment_v0",
     }
 
-    def __init__(self, env_config):
+    def __init__(self, env_config, render_mode):
         """The init method takes in environment arguments.
 
         Should define the following attributes:
@@ -130,6 +130,8 @@ class CustomEnvironment(ParallelEnv):
         #grid sizes
         self.grid_size_x = env_config['grid_size_x'] # [0,x)
         self.grid_size_y = env_config['grid_size_y'] #[0,y)
+        self.render_mode = render_mode
+        
 
         #screen parameters for rendering
         self.screen_width = env_config['screen_width']
@@ -146,7 +148,7 @@ class CustomEnvironment(ParallelEnv):
         self.move_penalty = env_config['move_penalty']
         self.move_stamina_loss = env_config['move_stamina_loss']
         self.max_vision_size = env_config['max_vision']
-        self.reset()
+        # self.reset()
 
     def reset(self, seed=None, options=None):
         """Reset set the environment to a starting point.
@@ -191,6 +193,12 @@ class CustomEnvironment(ParallelEnv):
             id : {} for id,a in self.agents_objects.items()
         }
 
+        if(self.render_mode == "human"):
+            pygame.init()
+            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+            pygame.display.set_caption("THE GAME")
+            self.agent_size = 5
+            self.pellet_size = 2
 
         #DEBUG
         # print(self.move_stamina_loss)
@@ -326,6 +334,8 @@ class CustomEnvironment(ParallelEnv):
         infos = {id : {} for id,a in self.agents_objects.items()}
 
         # self.render()
+        if(self.render_mode == "human"):
+            self.render()
 
         return observations, rewards, terminations, truncations, infos
     
@@ -444,8 +454,36 @@ class CustomEnvironment(ParallelEnv):
         return box
 
     def render(self):
-        self.screen = pygame.display.set_mode((self.grid_size_x,self.grid_size_y))
-        pygame.display.set_caption("Evolution Simulation")
+        agent_pos = [[] for a in self.agents]
+        i = 0
+        for id,agent in self.agents_objects.items():
+            agent_pos[i] = [agent.pos_x, agent.pos_y]
+            i += 1
+
+        # Generate two food positions
+        pellet_pos = [[] for a in self.pellets]
+        i = 0
+        for pellet in self.pellets:
+            pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
+            i += 1
+
+        self.screen.fill(WHITE)
+        
+        # Draw the player circle (relative to coordinate space position)
+        for pos in agent_pos:
+            screen_pos = [pos[0] * (self.screen_width / self.grid_size_x), pos[1] * (self.screen_height / self.grid_size_y)]
+            pygame.draw.circle(self.screen, RED, screen_pos, 5)
+
+        # Draw the food circles (relative to coordinate space position)
+        for pos in pellet_pos:
+            screen_pos = [pos[0] * (self.screen_width / self.grid_size_x), pos[1] * (self.screen_height / self.grid_size_y)]
+            pygame.draw.circle(self.screen, GREEN, screen_pos, 2)
+
+        # Update the display
+        pygame.display.flip()
+
+        sleep(0.1)
+
 
     # Observation space should be defined here.
     @functools.lru_cache(maxsize=None)
