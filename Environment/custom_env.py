@@ -174,34 +174,34 @@ class CustomEnvironment(ParallelEnv):
         # 2. Check if any pellets were consumed, set them as inactive 
         # 3. Update observations for agents
         # 4. Assign rewards
-        terminations = {a.id : False for a in self.possible_agents_objects}
-        rewards = {a.id : 0 for a in self.agents_objects}
-        truncations = {a.id : False for a in self.agents_objects}
-        observations = None
+        terminations = {a : False for a in self.agents}
+        rewards = {a : 0 for a in self.agents}
+        truncations = {a : False for a in self.agents}
+        observations = {a : None for a in self.agents}
         infos = None
         
-        allDead = True
-        for agent in self.agents_objects:
-            if agent.active == True:
-                allDead = False
-                break
+        # allDead = True
+        # for agent in self.agents_objects:
+        #     if agent.active == True:
+        #         allDead = False
+        #         break
         
-        if(allDead):
-            rewards = {a.id : 0 for a in self.agents_objects}
-            terminations = {a.id : True for a in self.agents_objects}
-            self.agents_objects = []
-            self.agents = []
-            self.pellets = []
-            return observations, rewards, terminations, truncations, infos
+        # if(allDead):
+        #     rewards = {a.id : 0 for a in self.agents_objects}
+        #     terminations = {a.id : True for a in self.agents_objects}
+        #     self.agents_objects = []
+        #     self.agents = []
+        #     self.pellets = []
+        #     return observations, rewards, terminations, truncations, infos
             
         for id,agent in enumerate(self.agents_objects):
             # print(str(agent.id) + ": " + str(agent.stamina))
             #move agent
             #skip dead agents
-            if(agent.active == False): 
-                terminations[agent.id] = True
-                rewards[agent.id] = 0
-                continue
+            # if(agent.active == False): 
+            #     terminations[agent.id] = True
+            #     rewards[agent.id] = 0
+            #     continue
             
             action = actions[agent.id]
             
@@ -247,16 +247,12 @@ class CustomEnvironment(ParallelEnv):
                 agent.reward += self.pellet_collect_reward
                 rewards[agent.id] = self.pellet_collect_reward
                 
-
+            #update observation of agent after moving it and before terminating it
+            observations[agent.id] = self.make_observation_space(agent)
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
                 print("agent" + str(agent.id) + " died at time " + str(self.timestep))
-                # for i in range(len(self.agents_objects)):
-                #     if(agent.id == self.agents_objects[i].id):
-                #         self.agents_objects.pop(i)
-                #         self.agents.pop(i)
-                #         break
                 agent.active = False
                 terminations[agent.id] = True
                 for a in self.agents_objects:
@@ -267,7 +263,7 @@ class CustomEnvironment(ParallelEnv):
                         self.agents.remove(a)
                 
         #update observation
-        observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
+        # observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
 
         # Check truncation conditions (overwrites termination conditions)
         if(self.timestep) > 500:
