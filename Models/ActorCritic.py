@@ -41,6 +41,8 @@ class Actor(nn.Module):
         '''
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
+            
+        state = state.to(self.device)
                     
         feature_map = self.feature_extractor(state)
         probs = F.gumbel_softmax(self.mlp_block(feature_map.flatten(-3)), dim=-1)
@@ -66,6 +68,8 @@ class Critic(nn.Module):
     def forward(self, state):
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
+            
+        state = state.to(self.device)
         
         feature_map = self.feature_extractor(state)
         state_val = self.mlp_block(feature_map.flatten(-3))
@@ -83,8 +87,8 @@ class ActorCritic(RLAgent):
         '''
         super().__init__(config)
         
-        self.actor = Actor(config)
-        self.critic = Critic(config)
+        self.actor = Actor(config).to(self.device)
+        self.critic = Critic(config).to(self.device)
         
         self.actor_step_size = config['actor_step_size']
         self.critic_step_size = config['critic_step_size']
@@ -103,6 +107,7 @@ class ActorCritic(RLAgent):
             - (int): selected action
             - (float): log probability of selecting the action given the state 
         '''
+        state = state.to(self.device)
         # make sure the input is in batch format
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
@@ -122,6 +127,8 @@ class ActorCritic(RLAgent):
         '''
         
         state, action, reward, next_state, log_prob, done = args
+        
+        state, action, reward, next_state, log_prob, done = state.to(self.device), action, reward, next_state.to(self.device), log_prob.to(self.device), done 
         
         # next_state = None if done else next_state.unsqueeze(0)
         
@@ -153,6 +160,13 @@ class ActorCritic(RLAgent):
         # print()
         if batch is None:
             return
+        
+        batch['states'] = batch['states'].to(self.device)
+        batch['actions'] = batch['actions'].to(self.device)
+        batch['rewards'] = batch['rewards'].to(self.device)
+        batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
+        batch['non_final_next_states'] = batch['non_final_next_states'].to(self.device)
+        batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
         state_values = self.critic(batch['states'])
         

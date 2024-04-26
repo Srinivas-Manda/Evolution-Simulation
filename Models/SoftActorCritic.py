@@ -21,6 +21,8 @@ class QNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
         
+        self.device = config['device']
+        
         self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
         
         self.mlp_block = create_linear_network(input_dim=config['out_channels']+config['num_actions'], output_dim=1, hidden_dims=config['hidden_dims'])
@@ -31,6 +33,9 @@ class QNetwork(nn.Module):
         
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
+            
+        actions = actions.to(self.device)
+        state = state.to(self.device)
         
         x = self.feature_extractor(state).flatten(-3)
         
@@ -213,6 +218,13 @@ class SoftActorCritic(RLAgent):
         # when buffer is not filled enough
         if batch is None:
             return
+        
+        batch['states'] = batch['states'].to(self.device)
+        batch['actions'] = batch['actions'].to(self.device)
+        batch['rewards'] = batch['rewards'].to(self.device)
+        batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
+        batch['non_final_next_states'] = batch['non_final_next_states'].to(self.device)
+        batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
         # create an action one hot vector
         actions = torch.zeros((batch['actions']).shape[0], self.num_actions)
