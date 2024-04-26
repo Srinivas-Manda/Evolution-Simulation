@@ -49,7 +49,8 @@ class QNetwork(nn.Module):
 class GaussianPolicy(nn.Module):
     def __init__(self, config):
         super().__init__()
-        
+        self.device = config["device"]
+
         self.log_std_min = config['log_std_min']
         self.log_std_max = config['log_std_max']
         self.eps = config['epsilon']
@@ -61,9 +62,11 @@ class GaussianPolicy(nn.Module):
         
     # returns the mean and log_std of the gaussian
     def forward(self, state):
+
         if len(state.shape) == 3:
             state = state.unsqueeze(0)
-        
+
+        state = state.to(self.device)
         x = self.policy_conv(state)
 
         x = self.policy_lin(x.flatten(-3))
@@ -94,10 +97,10 @@ class SoftActorCritic(RLAgent):
         super().__init__(config)
         
         # actor
-        self.actor_policy_net = GaussianPolicy(config=config)
+        self.actor_policy_net = GaussianPolicy(config=config).to(self.device)
         # critics
-        self.critic_q_net = QNetwork(config=config)
-        self.critic_q_target_net = QNetwork(config=config)
+        self.critic_q_net = QNetwork(config=config).to(self.device)
+        self.critic_q_target_net = QNetwork(config=config).to(self.device)
         
         # optimisers
         self.policy_step_size = config["actor_step_size"]
@@ -134,7 +137,7 @@ class SoftActorCritic(RLAgent):
 
         # happens when pushing just one transition
         if type(dones) is bool:
-            dones = torch.Tensor([dones])
+            dones = torch.tensor([dones]).to(self.device)
 
         # calculate the target 
         target_q = rewards + torch.logical_not(dones).reshape(-1, 1) * self.discount_factor * next_q
@@ -179,7 +182,7 @@ class SoftActorCritic(RLAgent):
         # the exploration probability distribution, entropies and the mean distribution
         probs, _, _ = self.actor_policy_net.sample(state)
         
-        return torch.argmax(probs, dim=-1), probs[:, torch.argmax(probs, dim=-1)]
+        return torch.argmax(probs, dim=-1).item(), probs[:, torch.argmax(probs, dim=-1)]
     
     def push_to_buffer(self, *args):
         '''Given the state, action, reward, next_state, log probability, done (in that order), the buffer is updated after calculating the loss
@@ -223,7 +226,6 @@ class SoftActorCritic(RLAgent):
         batch['actions'] = batch['actions'].to(self.device)
         batch['rewards'] = batch['rewards'].to(self.device)
         batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
-        batch['non_final_next_states'] = batch['non_final_next_states'].to(self.device)
         batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
         # create an action one hot vector

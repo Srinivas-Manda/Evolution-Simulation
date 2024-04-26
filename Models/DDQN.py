@@ -50,8 +50,8 @@ class DoubleDQN(RLAgent):
         super().__init__(config=config)
         
         # initialise the networks
-        self.policy_net = QNetwork(config=config)
-        self.target_net = QNetwork(config=config)
+        self.policy_net = QNetwork(config=config).to(self.device)
+        self.target_net = QNetwork(config=config).to(self.device)
         
         # initialise the optimiser
         self.policy_step_size = config['policy_step_size']
@@ -72,7 +72,7 @@ class DoubleDQN(RLAgent):
             next_q = self.target_net(next_state)
             
         if type(done) is bool:
-            done = torch.Tensor([done])
+            done = torch.Tensor([done]).to(self.device)
             
         target_q = reward + torch.logical_not(done).reshape(-1, 1) * self.discount_factor * next_q
         
@@ -84,7 +84,7 @@ class DoubleDQN(RLAgent):
         target_q = self.calc_target_q_value(reward=reward, next_state=next_state, done=done)
         
         if type(action) is not torch.Tensor:
-            action = torch.tensor([action], dtype=torch.int)
+            action = torch.tensor([action], dtype=torch.int).to(self.device)
         
         loss = F.mse_loss(curr_q[np.arange(curr_q.shape[0]), action.squeeze()], target_q.max(dim=-1)[0])
         
@@ -127,7 +127,7 @@ class DoubleDQN(RLAgent):
             # target_q = self.calc_target_q_value(reward=reward, next_state=next_state, done=done)
             
             # loss = F.mse_loss(curr_q[0, action], target_q.max())
-            loss = self.calc_policy_loss(state, action, reward, next_state, done)
+            loss = self.calc_policy_loss(state.to(self.device), action.to(self.device), reward.to(self.device), next_state.to(self.device), done.to(self.device))
             
         
         # print(state.shape)
@@ -164,7 +164,6 @@ class DoubleDQN(RLAgent):
         batch['actions'] = batch['actions'].to(self.device)
         batch['rewards'] = batch['rewards'].to(self.device)
         batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
-        batch['non_final_next_states'] = batch['non_final_next_states'].to(self.device)
         batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
         # calculate policy loss and update policy weights

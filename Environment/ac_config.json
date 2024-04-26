@@ -9,5 +9,5 @@
     "batch_size": 1,
     "discount_factor": 0.9,
     "capacity": 1,
-    "device": "cpu"
+    "device": "cuda"
 }

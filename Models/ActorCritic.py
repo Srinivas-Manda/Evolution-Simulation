@@ -165,7 +165,6 @@ class ActorCritic(RLAgent):
         batch['actions'] = batch['actions'].to(self.device)
         batch['rewards'] = batch['rewards'].to(self.device)
         batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
-        batch['non_final_next_states'] = batch['non_final_next_states'].to(self.device)
         batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
         state_values = self.critic(batch['states'])
