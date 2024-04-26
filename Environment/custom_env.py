@@ -286,7 +286,7 @@ class CustomEnvironment(ParallelEnv):
             flagPelletConsumed = False
             for pellet in self.pellets:
                 if(self.get_entity_collision(agent, pellet)):
-                    print("agent" + str(id) + " consumed pellet" + str(pellet.pellet_id))
+                    # print("agent" + str(id) + " consumed pellet" + str(pellet.pellet_id))
                     for i in range(len(self.pellets)):
                         if(self.pellets[i].pellet_id == pellet.pellet_id):
                             self.pellets.pop(i)
@@ -351,15 +351,18 @@ class CustomEnvironment(ParallelEnv):
         pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
 
         for i,id in enumerate(self.agents_objects): # iterating over all agents
-            if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
-                x = pos_x[i]
-                y = self.grid_size_y-1 if edge[i]==2 else 0
+            # self.agent
+            x = np.random.randint(low=self.grid_size_x//10, high=9*(self.grid_size_x//10))
+            y = np.random.randint(low=self.grid_size_y//10, high=9*(self.grid_size_y//10))
+            # if(edge[i]==0 or edge[i] ==2): # if top or bottom edge
+            #     x = pos_x[i]
+            #     y = self.grid_size_y-1 if edge[i]==2 else 0
                 
-            elif(edge[i]==1 or edge[i] ==3): # if left or right edge
-                y = pos_y[i]
-                x = self.grid_size_x-1 if edge[i]==1 else 0
+            # elif(edge[i]==1 or edge[i] ==3): # if left or right edge
+            #     y = pos_y[i]
+            #     x = self.grid_size_x-1 if edge[i]==1 else 0
             
-            self.agents_objects[id].update_pos(x,y) # setting the position of agent
+            self.agents_objects[id].update_pos(x, y) # setting the position of agent
 
         points = set() # creating a set for different pellets
 
@@ -371,19 +374,23 @@ class CustomEnvironment(ParallelEnv):
         points = [list(point) for point in points]
         points = np.array(points)
         
-        #k-means++ start
-        init_pellet = np.random.choice(range(len(points)))
+        # #k-means++ start
+        # init_pellet = np.random.choice(range(len(points)))
 
-        temp_pellets = np.zeros((self.num_pellets, 2))
-        temp_pellets[0] = points[init_pellet]
+        # temp_pellets = np.zeros((self.num_pellets, 2))
+        # temp_pellets[0] = points[init_pellet]
         
-        for i in range(1, self.num_pellets):
-            distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
-            probs = distances ** 2
-            probs /= probs.sum(axis=0)
-            temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
+        # for i in range(1, self.num_pellets):
+        #     distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
+        #     probs = distances ** 2
+        #     probs /= probs.sum(axis=0)
+        #     temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
 
-        #k-means++ end
+        # #k-means++ end
+
+        # random init start
+        temp_pellets_ind = np.random.choice(np.arange(len(points)), size=self.num_pellets, replace=False)
+        temp_pellets = points[temp_pellets_ind]
 
         #pellet positions are updated
         for i, pellet in enumerate(self.pellets):
