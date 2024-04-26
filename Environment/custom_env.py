@@ -146,6 +146,7 @@ class CustomEnvironment(ParallelEnv):
         self.move_penalty = env_config['move_penalty']
         self.move_stamina_loss = env_config['move_stamina_loss']
         self.max_vision_size = env_config['max_vision']
+        self.reset()
 
     def reset(self, seed=None, options=None):
         """Reset set the environment to a starting point.
@@ -237,7 +238,7 @@ class CustomEnvironment(ParallelEnv):
         #     self.agents = []
         #     self.pellets = []
         #     return observations, rewards, terminations, truncations, infos
-            
+        to_delete = []
         for id,agent in self.agents_objects.items():
             # print(str(agent.id) + ": " + str(agent.stamina))
             #move agent
@@ -300,17 +301,18 @@ class CustomEnvironment(ParallelEnv):
                 agent.active = False
                 self.justdie[id] = agent
                 terminations[agent.id] = True
-                del self.agents_objects[id]
-                # for id,a in self.agents_objects.items():
-                    # if(a.id == agent.id):
-                        # self.agents_objects.remove(a)
+                # del self.agents_objects[id]
+                to_delete.append(id)
                 for a in self.agents:
                     if(a == agent.id):
                         self.agents.remove(a)
                 
         #update observation
         # observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
-
+        for id in to_delete:
+            del self.agents_objects[id]
+        
+        to_delete = []
         # Check truncation conditions (overwrites termination conditions)
         if(self.timestep) > 500:
             rewards = {id : 0 for id,a in self.agents_objects.items()}
