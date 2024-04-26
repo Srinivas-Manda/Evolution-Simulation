@@ -5,8 +5,11 @@ import pygame
 import math
 import numpy as np
 from gymnasium.spaces import Discrete, MultiDiscrete, Box
-
+from Models.ActorCritic import ActorCritic
+from Models.SoftActorCritic import SoftActorCritic
+from Models.DDQN import DoubleDQN
 from pettingzoo import ParallelEnv
+import json
 
 # Colors
 # what this nigga
@@ -15,8 +18,22 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
+ac_config = open('Models/ac_config.json')
+ac_variables = json.load(ac_config)
+ac_config.close
+
+sac_config = open('Models/sac_config.json')
+sac_variables = json.load(sac_config)
+sac_config.close
+
+ddqn_config = open('Models/ddqn_config.json')
+ddqn_variables = json.load(ddqn_config)
+ddqn_config.close
+
 class Entity:
+
     def __init__(self, type = None) -> None:
+
         self.pos_x = None
         self.pos_y = None
         self.type = type
@@ -26,12 +43,16 @@ class Entity:
         self.pos_y = y
 
 class Pellet(Entity):
+
     def __init__(self, id) -> None:
+
         super().__init__("Pellet")
         self.pellet_id = id
 
 class Agent(Entity):
+
     def __init__(self, name, id) -> None:
+
         super().__init__("Agent")
         self.strength = None
         self.vision_size = None
@@ -41,6 +62,24 @@ class Agent(Entity):
         self.name = name
         self.reward = 0
         self.active = True
+        self.brain1 = None
+
+        self.set_brain_1()
+
+    def set_brain_1(self, agent_type):
+
+        if(agent_type == "AC"):
+            self.brain1 = ActorCritic(ac_variables)
+        
+        elif(agent_type == "SAC"):
+            self.brain1 = SoftActorCritic(sac_variables)
+
+        elif(agent_type == "DDQN"):
+            self.brain1 = DoubleDQN(ddqn_variables)
+
+        else:
+            raise(f"{agent_type} is invalid")
+
 
 class CustomEnvironment(ParallelEnv):
     """The metadata holds environment constants.
