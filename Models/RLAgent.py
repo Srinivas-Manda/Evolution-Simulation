@@ -30,6 +30,18 @@ class RLAgent:
         self.discount_factor = config["discount_factor"]
         self.num_actions = config['num_actions']
         self.device = config['device']
+        
+        if not "grad_clip" in config:
+            self.grad_clip = None
+        else:
+            self.grad_clip = config['grad_clip']
+        
+        if not "tau" in config:
+            self.tau = None
+        else:
+            self.tau = config['tau']
+            if self.tau is None:
+                raise("tau cannot be None")
                 
                 
     def push_to_buffer(self, *args):
@@ -38,8 +50,25 @@ class RLAgent:
         raise NotImplementedError("push_to_buffer is not implemented")
         
     def select_action(self, state):
-        raise NotImplementedError("Select action function not implemented")
+        raise NotImplementedError("select_action is not implemented")
         
+    def update_weights(self):
+        raise NotImplementedError("update_weights is not implemented")    
+    
+    # soft target network update
+    def soft_update(self, target, source):
+        for t, s in zip(target.parameters(), source.parameters()):
+            t.data.copy_(t.data * (1.0 - self.tau) + s.data * self.tau)
+    
+    
+    def param_step(self, optim, network, loss, retain_graph=False):
+        optim.zero_grad()
+        loss.backward(retain_graph=retain_graph)
+        if self.grad_clip is not None:
+            for p in network.modules():
+                torch.nn.utils.clip_grad_norm_(p.parameters(), self.grad_clip)
+        optim.step()
+    
     def sample_from_buffer(self, batch_size, experience=True):
         '''Sample batch_size number of transitions from the replay buffer
         
