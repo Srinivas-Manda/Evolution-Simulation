@@ -119,7 +119,6 @@ class CustomEnvironment(ParallelEnv):
         self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
         self.n_agents = env_config["num_agents"]
         self.num_actions = env_config["num_actions"]
-        self.justdie = None
 
         for id,a in self.possible_agents_objects.items():
             a.strength = env_config["default_strength"]
@@ -135,7 +134,6 @@ class CustomEnvironment(ParallelEnv):
         self.grid_size_y = env_config['grid_size_y'] #[0,y)
         self.render_mode = render_mode
         
-
         #screen parameters for rendering
         self.screen_width = env_config['screen_width']
         self.screen_height = env_config['screen_height']
@@ -188,7 +186,7 @@ class CustomEnvironment(ParallelEnv):
 
         #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
-          id : self.make_observation_space(a) for id,a in self.agents_objects.items()
+          id : self.make_observation_space(a)[0] for id,a in self.agents_objects.items()
         }
         
         #havent thought up of necessary infos
@@ -245,8 +243,8 @@ class CustomEnvironment(ParallelEnv):
             action = actions[id]
             
             #YAAD SE APPLY WORLD LIMIT
-            move_x = np.cos(np.deg2rad(action))
-            move_y = np.sin(np.deg2rad(action))
+            move_x = np.cos(np.deg2rad((action/self.num_actions)*360))
+            move_y = np.sin(np.deg2rad((action/self.num_actions)*360))
             move_x = np.sqrt(agent.movement_speed) * move_x
             move_y = np.sqrt(agent.movement_speed) * move_y
             agent.pos_x += move_x
@@ -254,6 +252,7 @@ class CustomEnvironment(ParallelEnv):
 
             #apply world limits here
             # X limits
+            offlimits = False
             if(agent.pos_x < 0):
                 agent.pos_x = 0
             elif(agent.pos_x >= self.grid_size_x):
@@ -264,6 +263,9 @@ class CustomEnvironment(ParallelEnv):
             elif(agent.pos_y >= self.grid_size_y):
                 agent.pos_y = self.grid_size_y
             
+                
+            #update observation of agent after moving it and before terminating it
+            observations[id], min_pellet_dist = self.make_observation_space(agent)
 
             #check for pellet consumption and assign reward
             flagPelletConsumed = False
@@ -279,15 +281,14 @@ class CustomEnvironment(ParallelEnv):
             
             if(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
-                agent.reward -= self.move_penalty
-                rewards[id] = self.move_penalty
+                # agent.reward -= self.move_penalty
+                agent.reward -= float(min_pellet_dist/(self.max_vision_size * pow(2,0.5)))
+                # rewards[id] -= self.move_penalty
+                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * pow(2,0.5)))
             else:
                 agent.stamina += self.pellet_stamina_gain
                 agent.reward += self.pellet_collect_reward
                 rewards[id] = self.pellet_collect_reward
-                
-            #update observation of agent after moving it and before terminating it
-            observations[id] = self.make_observation_space(agent)
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
@@ -309,7 +310,7 @@ class CustomEnvironment(ParallelEnv):
         to_delete = []
         # Check truncation conditions (overwrites termination conditions)
         if(self.timestep) > 500:
-            rewards = {id : 0 for id,a in self.agents_objects.items()}
+            rewards = {id : 0 for id, a in self.agents_objects.items()}
             truncations = {id : True for id,a in self.agents_objects.items()}
             self.agents_objects = []
             self.agents = []
@@ -413,6 +414,7 @@ class CustomEnvironment(ParallelEnv):
         for temp_pellet in self.pellets:
             pellet_pos.append([math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y)])
 
+        min_pellet_dist = self.max_vision_size + 1
         # using val to fix for the odd or even vision size
         for i in range(-agent.vision_size, agent.vision_size + 1 ):
             for j in range(-agent.vision_size, agent.vision_size + 1):
@@ -434,13 +436,15 @@ class CustomEnvironment(ParallelEnv):
 
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
+                    dist = (x - agent.pos_x)**2 + (y - agent.pos_y)**2
+                    min_pellet_dist = min(min_pellet_dist, dist)
                     box[1,self.max_vision_size+i,self.max_vision_size+j] = 1
 
                 #inside the vision size but outside the grid
                 if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
                     box[2,self.max_vision_size+i,self.max_vision_size+j] = 1
 
-        return box
+        return box, min_pellet_dist
 
     def render(self):
         pygame.event.get()

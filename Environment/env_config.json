@@ -2,7 +2,7 @@
  "num_pellets" : 100,
  "agents" : ["DDQN","AC","SAC"],
  "num_agents" : 3,
- "num_actions" : 360,
+ "num_actions" : 90,
  
  "default_vision" : 10,
  "default_movement_speed" : 1,
@@ -21,6 +21,6 @@
 
  "move_penalty" : 0.25,
  "pellet_stamina_gain" : 20,
- "pellet_collect_reward": 1,
+ "pellet_collect_reward": 2,
  "move_stamina_loss" : 1
 }
