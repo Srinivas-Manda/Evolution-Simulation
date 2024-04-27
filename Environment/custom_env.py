@@ -62,7 +62,7 @@ class Agent(Entity):
     def __init__(self, name, id) -> None:
 
         super().__init__("Agent")
-        self.strength = None
+        self.strength = 1
         self.vision_size = None
         self.movement_speed = None
         self.stamina = None
@@ -262,13 +262,17 @@ class CustomEnvironment(ParallelEnv):
             offlimits = False
             if(agent.pos_x < 0):
                 agent.pos_x = 0
+                offlimits = True
             elif(agent.pos_x >= self.grid_size_x):
                 agent.pos_x = self.grid_size_x
+                offlimits = True
             # Y limits
             if(agent.pos_y < 0):
                 agent.pos_y = 0
+                offlimits = True
             elif(agent.pos_y >= self.grid_size_y):
                 agent.pos_y = self.grid_size_y
+                offlimits = True
             
                 
             #update observation of agent after moving it and before terminating it
@@ -297,12 +301,18 @@ class CustomEnvironment(ParallelEnv):
             #         flagPelletConsumed = True
             #         break
             
-            if(flagPelletConsumed == False):
+            if offlimits:
+                agent.stamina -= self.move_stamina_loss
+                agent.reward -= 3 * self.move_penalty
+                rewards[id] = -3 * self.move_penalty
+            
+            elif(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
                 # agent.reward -= self.move_penalty
-                agent.reward -= float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
-                # rewards[id] -= self.move_penalty
-                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                agent.reward += float(1 - min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                # rewards[id] = -1*self.move_penalty
+                rewards[id] = float(1 - min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+
             else:
                 agent.stamina += self.pellet_stamina_gain
                 agent.reward += self.pellet_collect_reward
@@ -422,7 +432,7 @@ class CustomEnvironment(ParallelEnv):
         # return dist_x + agent.vision_size * dist_y
 
     #observation space generation given an agent
-    def make_observation_space(self,agent):
+    def make_observation_space(self, agent):
         temp = Box(low = -1, high = -1, shape=(3, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.int32)
         box = temp.sample()
         agent_pos = {}
@@ -441,29 +451,30 @@ class CustomEnvironment(ParallelEnv):
             for j in range(-agent.vision_size, agent.vision_size + 1):
 
                 #recheck these two
-                x = math.floor(agent.pos_x + i)
-                y = math.floor(agent.pos_y + j)
+                x = math.floor(agent.pos_x) + i
+                y = math.floor(agent.pos_y) + j
                 
                 #initiate nothing is of interest in these
-                box[0,self.max_vision_size+j,self.max_vision_size+i] = 0
-                box[1,self.max_vision_size+j,self.max_vision_size+i] = 0
-                box[2,self.max_vision_size+j,self.max_vision_size+i] = 0
-                
+                box[0, self.max_vision_size+j, self.max_vision_size+i] = 0
+                box[1, self.max_vision_size+j, self.max_vision_size+i] = 0
+                box[2, self.max_vision_size+j, self.max_vision_size+i] = 0
+                 
                 for tup in agent_pos.items():
                     id,pos = tup
+                    pos = pos[:-1]
                     # if inside the vision size, then set the strength of the other agent as the value 
                     if [x,y] == pos:
-                        box[0,self.max_vision_size+j,self.max_vision_size+i] = self.agents_objects[id].strength
+                        box[0, self.max_vision_size+j, self.max_vision_size+i] = self.agents_objects[id].strength
 
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
                     dist = math.sqrt((x - agent.pos_x)**2 + (y - agent.pos_y)**2)
                     min_pellet_dist = min(min_pellet_dist, dist)
-                    box[1,self.max_vision_size+j,self.max_vision_size+i] = 1
+                    box[1, self.max_vision_size+j, self.max_vision_size+i] = 1
 
                 #inside the vision size but outside the grid
                 if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
-                    box[2,self.max_vision_size+j,self.max_vision_size+i] = 1
+                    box[2, self.max_vision_size+j, self.max_vision_size+i] = 1
 
         return box, min_pellet_dist
 
@@ -530,12 +541,10 @@ class CustomEnvironment(ParallelEnv):
         # sleep(1)
 
     # Observation space should be defined here.
-    @functools.lru_cache(maxsize=None)
     def observation_space(self, id):
         return self.observation_spaces[id]
 
     # Action space should be defined here.
-    @functools.lru_cache(maxsize=None)
     def action_space(self, id):
         return Discrete(360)
         

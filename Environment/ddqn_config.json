@@ -5,7 +5,7 @@
     "hidden_dims": [128],
     "num_actions": 360,
     "policy_step_size": 1e-2,
-    "batch_size": 128,
+    "batch_size": 32,
     "discount_factor": 0.75,
     "capacity": 500,
     "device": "cuda",
@@ -13,6 +13,6 @@
     "log_std_max": 20,
     "eps_start": 0.95,
     "eps_end": 0.05,
-    "eps_decay": 10000,
+    "eps_decay": 1000,
     "tau": 1e-2
 }
