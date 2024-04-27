@@ -300,9 +300,9 @@ class CustomEnvironment(ParallelEnv):
             if(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
                 # agent.reward -= self.move_penalty
-                agent.reward -= float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))
+                agent.reward -= float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
                 # rewards[id] -= self.move_penalty
-                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))
+                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
             else:
                 agent.stamina += self.pellet_stamina_gain
                 agent.reward += self.pellet_collect_reward
@@ -527,7 +527,7 @@ class CustomEnvironment(ParallelEnv):
         self.screen.blit(text_surface, (0, 0))
         pygame.display.flip()
 
-        sleep(1)
+        # sleep(1)
 
     # Observation space should be defined here.
     @functools.lru_cache(maxsize=None)
