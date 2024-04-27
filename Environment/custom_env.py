@@ -252,12 +252,14 @@ class CustomEnvironment(ParallelEnv):
             #YAAD SE APPLY WORLD LIMIT
             move_x = np.cos(np.deg2rad((action/self.num_actions)*360))
             move_y = np.sin(np.deg2rad((action/self.num_actions)*360))
-            move_x = np.sqrt(agent.movement_speed) * move_x
-            move_y = np.sqrt(agent.movement_speed) * move_y
+            move_x = agent.movement_speed * move_x
+            move_y = agent.movement_speed * move_y
+
             agent.pos_x += move_x
             agent.pos_y += move_y
 
             #apply world limits here
+            
             # X limits
             offlimits = False
             if(agent.pos_x < 0):
@@ -266,10 +268,12 @@ class CustomEnvironment(ParallelEnv):
             elif(agent.pos_x >= self.grid_size_x):
                 agent.pos_x = self.grid_size_x
                 offlimits = True
+
             # Y limits
             if(agent.pos_y < 0):
                 agent.pos_y = 0
                 offlimits = True
+
             elif(agent.pos_y >= self.grid_size_y):
                 agent.pos_y = self.grid_size_y
                 offlimits = True
