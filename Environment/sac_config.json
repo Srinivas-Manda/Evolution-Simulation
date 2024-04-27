@@ -1,17 +1,17 @@
 {
     "in_channels": 3,
-    "out_channels": 128,
-    "hidden_channels": [32, 64],
+    "out_channels": 32,
+    "hidden_channels": [8, 16],
     "hidden_dims": [128],
     "num_actions": 360,
     "actor_step_size": 1e-4,
     "critic_step_size": 1e-2,
-    "batch_size": 64,
-    "discount_factor": 0.95,
+    "batch_size": 128,
+    "discount_factor": 0.75,
     "capacity": 500,
     "device": "cuda",
     "log_std_min": -2,
     "log_std_max": 20,
     "epsilon": 1e-8,
-    "tau": 1e-3
+    "tau": 1e-2
 }

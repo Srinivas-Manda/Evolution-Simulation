@@ -198,6 +198,7 @@ class CustomEnvironment(ParallelEnv):
 
         if(self.render_mode == "human"):
             pygame.init()
+            self.font = pygame.font.Font(None, 32)
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
             pygame.display.set_caption("THE GAME")
             self.agent_size = 5
@@ -236,28 +237,10 @@ class CustomEnvironment(ParallelEnv):
         observations = {a : None for a in self.agents}
         infos = {a : None for a in self.agents}
         
-        # allDead = True
-        # for agent in self.agents_objects:
-        #     if agent.active == True:
-        #         allDead = False
-        #         break
-        
-        # if(allDead):
-        #     rewards = {a.id : 0 for a in self.agents_objects}
-        #     terminations = {a.id : True for a in self.agents_objects}
-        #     self.agents_objects = []
-        #     self.agents = []
-        #     self.pellets = []
-        #     return observations, rewards, terminations, truncations, infos
         to_delete = []
         for id,agent in self.agents_objects.items():
             # print(str(agent.id) + ": " + str(agent.stamina))
-            #move agent
-            #skip dead agents
-            # if(agent.active == False): 
-            #     terminations[agent.id] = True
-            #     rewards[agent.id] = 0
-            #     continue
+            #move agents
             
             action = actions[id]
             
@@ -333,10 +316,6 @@ class CustomEnvironment(ParallelEnv):
             self.pellets = []
         self.timestep += 1
 
-        # Get dummy infos (not used in this example)
-        # infos = {id : {} for id,a in self.agents_objects.items()}
-
-        # self.render()
         if(self.render_mode == "human"):
             self.render()
 
@@ -374,23 +353,23 @@ class CustomEnvironment(ParallelEnv):
         points = [list(point) for point in points]
         points = np.array(points)
         
-        # #k-means++ start
-        # init_pellet = np.random.choice(range(len(points)))
+        #k-means++ start
+        init_pellet = np.random.choice(range(len(points)))
 
-        # temp_pellets = np.zeros((self.num_pellets, 2))
-        # temp_pellets[0] = points[init_pellet]
+        temp_pellets = np.zeros((self.num_pellets, 2))
+        temp_pellets[0] = points[init_pellet]
         
-        # for i in range(1, self.num_pellets):
-        #     distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
-        #     probs = distances ** 2
-        #     probs /= probs.sum(axis=0)
-        #     temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
+        for i in range(1, self.num_pellets):
+            distances = np.sqrt(((points - temp_pellets[:i, np.newaxis])**2).sum(axis=2)).min(axis=0)
+            probs = distances ** 2
+            probs /= probs.sum(axis=0)
+            temp_pellets[i] = points[np.random.choice(points.shape[0], p=probs)]
 
-        # #k-means++ end
+        #k-means++ end
 
-        # random init start
-        temp_pellets_ind = np.random.choice(np.arange(len(points)), size=self.num_pellets, replace=False)
-        temp_pellets = points[temp_pellets_ind]
+        # # random init start
+        # temp_pellets_ind = np.random.choice(np.arange(len(points)), size=self.num_pellets, replace=False)
+        # temp_pellets = points[temp_pellets_ind]
 
         #pellet positions are updated
         for i, pellet in enumerate(self.pellets):
@@ -410,7 +389,7 @@ class CustomEnvironment(ParallelEnv):
         #     return "NOT_VISIBLE"
 
         #entity with the pellet's vision and hitting the agent
-        if(abs(dist_x) <= 0.5 and abs(dist_y) <= 0.5):
+        if(abs(dist_x) <= 1 and abs(dist_y) <= 1):
             return True
         
         return False
@@ -475,7 +454,6 @@ class CustomEnvironment(ParallelEnv):
                 pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
                 i += 1
 
-            
             # Draw the player circle (relative to coordinate space position)
             for id,agent in self.agents_objects.items():
                 screen_pos = [agent.pos_x * (self.screen_width / self.grid_size_x), agent.pos_y * (self.screen_height / self.grid_size_y)]
@@ -487,10 +465,12 @@ class CustomEnvironment(ParallelEnv):
                 pygame.draw.circle(self.screen, GREEN, screen_pos, 2)
 
             # Update the display
+
+        text_surface = self.font.render(str(self.timestep), True, BLACK)  # White text
+        self.screen.blit(text_surface, (0, 0))
         pygame.display.flip()
 
-        sleep(0.01)
-
+        # sleep(0.01)
 
     # Observation space should be defined here.
     @functools.lru_cache(maxsize=None)
@@ -504,7 +484,6 @@ class CustomEnvironment(ParallelEnv):
         
     # closes the rendering window
     def close(self):
-        # self.env.close()
         pygame.quit()
 
     #returns the state

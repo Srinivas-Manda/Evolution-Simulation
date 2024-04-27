@@ -93,7 +93,7 @@ class DoubleDQN(RLAgent):
     # gives an action and the corresponding log prob        
     def select_action(self, state):
         # calculate the threshold
-        eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(-1 * self.steps_done/self.eps_decay)
+        eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(-1 * min(self.steps_done, self.eps_decay)/self.eps_decay)
         
         with torch.no_grad():
             if len(state.shape) == 3:
