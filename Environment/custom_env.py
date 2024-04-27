@@ -116,7 +116,8 @@ class CustomEnvironment(ParallelEnv):
         #temporary agents and pellets list to store names, ids and their respective attributes
         self.possible_agents_objects = {id : Agent(agent_name,id) for id,agent_name in enumerate(env_config["agents"])} #changed this to dict
         self.possible_agents = [i for i in range(len(self.possible_agents_objects))]
-        self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
+        # self.possible_pellets = [Pellet(id) for id in range(env_config["num_pellets"])]
+        self.possible_pellets = {id : Pellet(id) for id in range(env_config["num_pellets"])} 
         self.n_agents = env_config["num_agents"]
         self.num_actions = env_config["num_actions"]
 
@@ -172,6 +173,7 @@ class CustomEnvironment(ParallelEnv):
         self.agents = copy(self.possible_agents) #agent id list
         self.agents_objects = copy(self.possible_agents_objects) #agent object list
         self.pellets = copy(self.possible_pellets)
+
         for id,a in self.agents_objects.items():
             a.stamina = self.agents_starting_stamina
             a.active = True
@@ -269,22 +271,33 @@ class CustomEnvironment(ParallelEnv):
 
             #check for pellet consumption and assign reward
             flagPelletConsumed = False
-            for pellet in self.pellets:
-                if(self.get_entity_collision(agent, pellet)):
-                    # print("agent" + str(id) + " consumed pellet" + str(pellet.pellet_id))
-                    for i in range(len(self.pellets)):
-                        if(self.pellets[i].pellet_id == pellet.pellet_id):
-                            self.pellets.pop(i)
-                            break
+            pellet_to_remove = []
+
+            for pellet_id,pellet in self.pellets.items():
+                if(self.get_entity_collision(agent,pellet)):
+                    pellet_to_remove.append(pellet_id)
                     flagPelletConsumed = True
                     break
+            
+            if(len(pellet_to_remove) == 1):
+                del self.pellets[pellet_to_remove[0]]
+
+            # for pellet in self.pellets:
+            #     if(self.get_entity_collision(agent, pellet)):
+            #         # print("agent" + str(id) + " consumed pellet" + str(pellet.pellet_id))
+            #         for i in range(len(self.pellets)):
+            #             if(self.pellets[i].pellet_id == pellet.pellet_id):
+            #                 self.pellets.pop(i)
+            #                 break
+            #         flagPelletConsumed = True
+            #         break
             
             if(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
                 # agent.reward -= self.move_penalty
-                agent.reward -= float(min_pellet_dist/(self.max_vision_size * pow(2,0.5)))
+                agent.reward -= float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))
                 # rewards[id] -= self.move_penalty
-                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * pow(2,0.5)))
+                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))
             else:
                 agent.stamina += self.pellet_stamina_gain
                 agent.reward += self.pellet_collect_reward
@@ -314,7 +327,7 @@ class CustomEnvironment(ParallelEnv):
             truncations = {id : True for id,a in self.agents_objects.items()}
             self.agents_objects = []
             self.agents = []
-            self.pellets = []
+            self.pellets = {}
         self.timestep += 1
 
         if(self.render_mode == "human"):
@@ -326,9 +339,9 @@ class CustomEnvironment(ParallelEnv):
     # self.np_random is defined in ParalleEnv. it is used to seed the randomnes
     def init_pos(self):
 
-        edge = np.random.randint(low = 0, high = 4, size = len(self.agents_objects)) # to pick an edge to initialise the agent on
-        pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents_objects), replace= False) # then to pick an x value for all agents
-        pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
+        # edge = np.random.randint(low = 0, high = 4, size = len(self.agents_objects)) # to pick an edge to initialise the agent on
+        # pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents_objects), replace= False) # then to pick an x value for all agents
+        # pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
 
         for i,id in enumerate(self.agents_objects): # iterating over all agents
             # self.agent
@@ -373,7 +386,7 @@ class CustomEnvironment(ParallelEnv):
         # temp_pellets = points[temp_pellets_ind]
 
         #pellet positions are updated
-        for i, pellet in enumerate(self.pellets):
+        for i, pellet in self.pellets.items():
             pellet.update_pos(temp_pellets[i, 0], temp_pellets[i, 1])
 
     #check for hit of an agent with any entity
@@ -411,10 +424,10 @@ class CustomEnvironment(ParallelEnv):
             if(id != agent.id):
                 agent_pos[id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
 
-        for temp_pellet in self.pellets:
+        for pellet_id,temp_pellet in self.pellets.items():
             pellet_pos.append([math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y)])
 
-        min_pellet_dist = self.max_vision_size + 1
+        min_pellet_dist = self.max_vision_size * math.sqrt(2)
         # using val to fix for the odd or even vision size
         for i in range(-agent.vision_size, agent.vision_size + 1 ):
             for j in range(-agent.vision_size, agent.vision_size + 1):
@@ -436,7 +449,7 @@ class CustomEnvironment(ParallelEnv):
 
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
-                    dist = (x - agent.pos_x)**2 + (y - agent.pos_y)**2
+                    dist = math.sqrt((x - agent.pos_x)**2 + (y - agent.pos_y)**2)
                     min_pellet_dist = min(min_pellet_dist, dist)
                     box[1,self.max_vision_size+i,self.max_vision_size+j] = 1
 
@@ -454,7 +467,7 @@ class CustomEnvironment(ParallelEnv):
             # Generate two food positions
             pellet_pos = [[] for a in self.pellets]
             i = 0
-            for pellet in self.pellets:
+            for pellet_id,pellet in self.pellets.items():
                 pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
                 i += 1
 
