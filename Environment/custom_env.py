@@ -270,7 +270,7 @@ class CustomEnvironment(ParallelEnv):
                 agent.pos_x = 0
                 offlimits = True
             elif(agent.pos_x >= self.grid_size_x):
-                agent.pos_x = self.grid_size_x
+                agent.pos_x = self.grid_size_x-1
                 offlimits = True
 
             # Y limits
@@ -279,7 +279,7 @@ class CustomEnvironment(ParallelEnv):
                 offlimits = True
 
             elif(agent.pos_y >= self.grid_size_y):
-                agent.pos_y = self.grid_size_y
+                agent.pos_y = self.grid_size_y-1
                 offlimits = True
             
                 
