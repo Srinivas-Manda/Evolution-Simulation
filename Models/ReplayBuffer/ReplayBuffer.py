@@ -26,7 +26,16 @@ class ReplayBuffer:
     def push(self, *args):
         '''Given the state, action, reward, next_state, done, loss (in that order), the queues are updated
         '''
-        self.transition_memory.append(Transition(*args[:-1]))
+        trans = Transition(*args[:-1])
+        # print(trans.state[0].shape)
+        # print(trans.state[1].shape)
+        # print(trans.action.shape)
+        # print(trans.reward.shape)
+        # print(trans.next_state[0].shape)
+        # print(trans.next_state[1].shape)
+        # print(trans.done.shape)
+        
+        self.transition_memory.append(trans)
         self.loss_memory.append(args[-1])
         
     def sample(self, batch_size, experience=True):
@@ -54,9 +63,19 @@ class ReplayBuffer:
         batch = [self.transition_memory[i] for i in batch_indices]
         # the issue is that the input to the network should be a batch of states, etc. Currently, we have batch of transitions, so we convert it to transitions of batches
         batch = Transition(*zip(*batch))
+        # curr_obs, curr_stam = zip(*batch.state)
         
         # tensors are obtained for the transition elements
-        state_batch = torch.cat(batch.state)
+        # print(batch.action.shape)
+        # print(batch.state[0].shape)
+        # print(batch.state[1].shape)
+        state_batch = []
+        # print(zip(*batch.state))
+        for i in zip(*batch.state):
+            # print(i)
+            state_batch.append(torch.cat(i))
+        # print(state_batch[0].shape)
+        state_batch = tuple(state_batch)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
         # done_batch = torch.cat(batch.done)
@@ -66,8 +85,16 @@ class ReplayBuffer:
             tuple(map(lambda s: s is not True, batch.done)),
             dtype=torch.bool,
         )
-        # next states are obtained in order
-        next_states = torch.cat([s if s is not None else torch.zeros_like(state_batch[0]).unsqueeze(0) for s in batch.next_state])
+        
+        next_states = []
+        # print(zip(*batch.state))
+        for i in zip(*batch.next_state):
+            # print(i)
+            next_states.append(torch.cat(i))
+        # print(next_states[0].shape)
+        next_states = tuple(next_states)
+        # # next states are obtained in order
+        # next_states = (torch.cat([s[0] if s is not None else torch.zeros_like(state_batch[0]).unsqueeze(0) for s in batch.next_state]), torch.cat([s[1] if s is not None else torch.zeros_like(state_batch[0]).unsqueeze(0) for s in batch.next_state]))
         
         
         return {

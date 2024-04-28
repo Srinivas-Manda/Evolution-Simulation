@@ -34,7 +34,7 @@ def create_linear_network(input_dim, output_dim, hidden_dims=[], dropout_prob=0.
     for next_units in hidden_dims:
         model.append(nn.Linear(units, next_units))
         model.append(nn.ReLU())
-        model.append(nn.Dropout(p=dropout_prob))
+        # model.append(nn.Dropout(p=dropout_prob))
         units = next_units
 
     model.append(nn.Linear(units, output_dim))

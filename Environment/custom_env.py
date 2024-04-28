@@ -1,6 +1,6 @@
 import functools
 import random
-from copy import copy
+from copy import copy, deepcopy
 import pygame
 import math
 import numpy as np
@@ -71,7 +71,8 @@ class Agent(Entity):
         self.reward = 0
         self.active = True
         self.brain1 = None
-        self.set_brain_1(name)
+        # self.set_brain_1(name)
+        self.discount_factor = 0.99
 
     def set_brain_1(self, agent_type):
 
@@ -132,6 +133,7 @@ class CustomEnvironment(ParallelEnv):
             a.movement_speed = env_config["default_movement_speed"]
 
         #initial number of pellets and agent's starting stamina  
+        self.max_episode_size = 500
         self.num_pellets = env_config["num_pellets"]
         self.agents_starting_stamina = env_config['stamina']
 
@@ -150,11 +152,13 @@ class CustomEnvironment(ParallelEnv):
         #rewards and penalties
         self.pellet_stamina_gain = env_config['pellet_stamina_gain']
         self.pellet_collect_reward = env_config['pellet_collect_reward']
-
+        # print(self.pellet_collect_reward)
+        
         #max values of agent attributes
         self.move_penalty = env_config['move_penalty']
         self.move_stamina_loss = env_config['move_stamina_loss']
         self.max_vision_size = env_config['max_vision']
+        print(self.move_penalty)
         # self.reset()
 
     def reset(self, seed=None, options=None):
@@ -175,9 +179,9 @@ class CustomEnvironment(ParallelEnv):
         """
         # super().reset(seed=seed) #set seed if necessary
 
-        self.agents = copy(self.possible_agents) #agent id list
-        self.agents_objects = copy(self.possible_agents_objects) #agent object list
-        self.pellets = copy(self.possible_pellets)
+        self.agents = deepcopy(self.possible_agents) #agent id list
+        self.agents_objects = deepcopy(self.possible_agents_objects) #agent object list
+        self.pellets = deepcopy(self.possible_pellets)
 
         for id,a in self.agents_objects.items():
             a.stamina = self.agents_starting_stamina
@@ -193,7 +197,7 @@ class CustomEnvironment(ParallelEnv):
 
         #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
-          id : self.make_observation_space(a)[0] for id,a in self.agents_objects.items()
+          id : (self.make_observation_space(a)[0], self.agents_starting_stamina - 1, math.floor(self.agents_objects[id].pos_x), math.floor(self.agents_objects[id].pos_y)) for id,a in self.agents_objects.items()
         }
         
         #havent thought up of necessary infos
@@ -243,7 +247,7 @@ class CustomEnvironment(ParallelEnv):
         infos = {a : None for a in self.agents}
         
         to_delete = []
-        for id,agent in self.agents_objects.items():
+        for id, agent in self.agents_objects.items():
             # print(str(agent.id) + ": " + str(agent.stamina))
             #move agents
             
@@ -304,27 +308,38 @@ class CustomEnvironment(ParallelEnv):
             #                 break
             #         flagPelletConsumed = True
             #         break
+            stamina_reward = math.exp(float((self.max_episode_size - self.timestep)/self.max_episode_size)) * self.move_penalty * 100
             
             if offlimits:
                 agent.stamina -= self.move_stamina_loss
-                agent.reward -= 10 * self.move_penalty
-                rewards[id] = -10 * self.move_penalty
+                # if agent.stamina == 0:
+                #     agent.reward = -stamina_reward + agent.discount_factor * agent.reward
+                #     rewards[id] -=stamina_reward
+                agent.reward = -10 * self.move_penalty + agent.discount_factor * agent.reward
+                rewards[id] -= 10 * self.move_penalty
             
             elif(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
+                # if agent.stamina == 0:
+                #     agent.reward = -stamina_reward + agent.discount_factor * agent.reward
+                #     rewards[id] -=stamina_reward
+                # else:
                 # agent.reward -= self.move_penalty
-                agent.reward -= float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                agent.reward = -1*math.exp(float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))) * 2 * self.move_penalty + agent.discount_factor * agent.reward
                 # rewards[id] = -1*self.move_penalty
-                rewards[id] = -1*float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                rewards[id] -= math.exp(float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))) * 2 * self.move_penalty
 
             else:
+                # print(f"Agent {id} consumed pellet")
                 agent.stamina += self.pellet_stamina_gain
-                agent.reward += self.pellet_collect_reward
-                rewards[id] = self.pellet_collect_reward
+                agent.reward = self.pellet_collect_reward + agent.discount_factor * agent.reward
+                rewards[id] += self.pellet_collect_reward
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
-                print("agent" + str(id) + " died at time " + str(self.timestep))
+                # print("agent" + str(id) + " died at time " + str(self.timestep))
+                print(f"Agent {id} episode return: {agent.reward: .2f}")
+                # print("agent" + str(id) + " died at time " + str(self.timestep))
                 agent.active = False
                 self.justdie[id] = agent
                 terminations[agent.id] = True
@@ -334,6 +349,8 @@ class CustomEnvironment(ParallelEnv):
                     if(a == agent.id):
                         self.agents.remove(a)
                 
+            observations[id] = (observations[id], self.agents_starting_stamina - self.timestep - 1, math.floor(agent.pos_x), math.floor(agent.pos_y))
+
         #update observation
         # observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
         for id in to_delete:
@@ -341,7 +358,7 @@ class CustomEnvironment(ParallelEnv):
         
         to_delete = []
         # Check truncation conditions (overwrites termination conditions)
-        if(self.timestep) > 500:
+        if(self.timestep) > self.max_episode_size:
             rewards = {id : 0 for id, a in self.agents_objects.items()}
             truncations = {id : True for id,a in self.agents_objects.items()}
             self.agents_objects = []
@@ -351,7 +368,7 @@ class CustomEnvironment(ParallelEnv):
 
         if(self.render_mode == "human"):
             self.render(observations)
-
+        
         return observations, rewards, terminations, truncations, infos
     
     # top is 0, right is 1, bottom is 2, left is 3. clockwise
@@ -437,7 +454,7 @@ class CustomEnvironment(ParallelEnv):
 
     #observation space generation given an agent
     def make_observation_space(self, agent):
-        temp = Box(low = -1, high = -1, shape=(3, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.int32)
+        temp = Box(low = -1, high = -1, shape=(3, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.float32)
         box = temp.sample()
         agent_pos = {}
         pellet_pos = []
@@ -521,7 +538,7 @@ class CustomEnvironment(ParallelEnv):
 
                 for row in range(grid_size):
                     for col in range(grid_size):
-                        cell_value = int(observations[id][1][row][col])
+                        cell_value = int(observations[id][0][1][row][col])
                         x = top_left_x + col * cell_dims
                         y = top_left_y + row * cell_dims
                         if(cell_value == 0):
