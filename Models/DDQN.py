@@ -25,21 +25,42 @@ else:
 class QNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
-        
+
+        self.flatten = False
+        if "flatten" in config and config['flatten'] == "True":
+            self.flatten = True
+            self.vision = 2 * config['vision_size'] + 1
+
         self.device = config['device']
         
-        self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
+        if self.flatten:
+            self.feature_extractor = create_linear_network(input_dim=self.vision*self.vision*config['in_channels'], output_dim=(self.vision//8)*(self.vision//8)*config['out_channels'], hidden_dims=[(self.vision//2)*(self.vision//2)*config['out_channels'], (self.vision//4)*(self.vision//4)*config['out_channels']])
+            self.mlp_block = create_linear_network(input_dim=(self.vision//8)*(self.vision//8)*config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
+            self.stamina_embedding = nn.Embedding(num_embeddings=config['max_stamina'], embedding_dim=(self.vision//8)*(self.vision//8)*config['out_channels'])
+            self.x_pos_embedding = nn.Embedding(num_embeddings=config['max_x'], embedding_dim=(self.vision//8)*(self.vision//8)*config['out_channels'])
+            self.y_pox_embedding = nn.Embedding(num_embeddings=config['max_y'], embedding_dim=(self.vision//8)*(self.vision//8)*config['out_channels'])
+        else:
+            self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
+            self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
+            self.stamina_embedding = nn.Embedding(num_embeddings=config['max_stamina'], embedding_dim=config['out_channels'])
+            self.x_pos_embedding = nn.Embedding(num_embeddings=config['max_x'], embedding_dim=config['out_channels'])
+            self.y_pox_embedding = nn.Embedding(num_embeddings=config['max_y'], embedding_dim=config['out_channels'])
         
-        self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
-        
-        self.stamina_embedding = nn.Embedding(num_embeddings=config['max_stamina'], embedding_dim=config['out_channels'])
-        self.x_pos_embedding = nn.Embedding(num_embeddings=config['max_x'], embedding_dim=config['out_channels'])
-        self.y_pox_embedding = nn.Embedding(num_embeddings=config['max_y'], embedding_dim=config['out_channels'])
         
     def forward(self, state):
         obs, stam, x, y = state
         if len(obs.shape) == 3:
             obs = obs.unsqueeze(0)
+
+        obs = obs.to(self.device)
+
+        if self.flatten:
+            # print(obs.shape)
+            obs = obs.flatten(-3)
+            # print(obs.shape)
+            feats = self.feature_extractor(obs)
+        else:
+            feats = self.feature_extractor(obs).flatten(-3)
             
         # lst = [stam, x, y]
         # for i, item in enumerate(lst):
@@ -68,16 +89,16 @@ class QNetwork(nn.Module):
         #     y = y.unsqueeze(0)
         y = y.to(self.device)
 
-        obs = obs.to(self.device)
         # stam = stam.to(self.device)
         # x = x.to(self.device)
         # y = y.to(self.device)
 
+        # try:
         stam_embed = self.stamina_embedding(stam)
         x_embed = self.x_pos_embedding(x)
         y_embed = self.y_pox_embedding(y)
+        # except IndexError:
         
-        feats = self.feature_extractor(obs).flatten(-3)
         
         # print(feats.shape)
         # print(stam_embed.shape)
@@ -99,6 +120,7 @@ class QNetwork(nn.Module):
 class DoubleDQN(RLAgent):
     def __init__(self, config):
         super().__init__(config=config)
+
         
         config['device'] = self.device
         # initialise the networks
@@ -120,13 +142,13 @@ class DoubleDQN(RLAgent):
     # calculate current q values
     def calc_current_q_values(self, state, network):
         # print("passing state")
-        return network(state)
+        return F.softmax(network(state), dim=-1)
     
     def calc_target_q_value(self, reward, next_state, done, network):
         with torch.no_grad():
             # print("passing next state")
             # print(next_state[0].shape)
-            next_q = network(next_state)
+            next_q = F.softmax(network(next_state), dim=-1)
             
         if type(done) is bool:
             done = torch.Tensor([done]).to(self.device)
@@ -144,8 +166,18 @@ class DoubleDQN(RLAgent):
         if type(action) is not torch.Tensor:
             action = torch.tensor([action], dtype=torch.int).to(self.device)
         
-        loss = F.mse_loss(curr_q[np.arange(curr_q.shape[0]), action.squeeze()], target_q.max(dim=-1)[0])
+        loss = F.mse_loss(curr_q[np.arange(curr_q.shape[0]), action.squeeze()], target_q.detach().max(dim=-1)[0])
+
+        # print(f"Curr Q Val: {curr_q}")
+        # print(f"All Curr Q Val: {curr_q[np.arange(curr_q.shape[0]), action.squeeze()]}")
+        # print(f"Actions Selected: {action}")
+        # print()
         
+        # print(f"All Next Q Val: {target_q}")
+        # print(f"Next Q Val: {target_q.max(dim=-1)[0]}")
+        # print(f"Actions Selected: {target_q.max(dim=-1)[1]}")
+        # print()
+
         return loss
 
     # gives an action and the corresponding log prob        
@@ -175,9 +207,9 @@ class DoubleDQN(RLAgent):
             
         # if action is to be chosen greedily
         if np.random.rand() > eps_threshold:
-            log_prob, action = torch.max(log_probs, dim=-1)
+            action_probs, action = torch.max(action_probs, dim=-1)
             
-            return action.item(), log_prob
+            return action.item(), torch.log(action_probs)
         # if random sampling needs to be done
         else:
             action = np.random.randint(0, self.num_actions)
@@ -282,7 +314,7 @@ if __name__ == '__main__':
         "hidden_dims": [32],
         "num_actions": 4,
         "policy_step_size": 1e-3,
-        "batch_size": 2,
+        "batch_size": 4,
         "discount_factor": 0.9,
         "capacity": 8,
         "device": 'cpu',

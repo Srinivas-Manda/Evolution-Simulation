@@ -1,9 +1,10 @@
 {
-    "in_channels": 3,
-    "out_channels": 32,
-    "hidden_channels": [8, 16],
-    "hidden_dims": [128],
-    "num_actions": 360,
+    "in_channels": 2,
+    "out_channels": 12,
+    "hidden_channels": [3, 6],
+    "hidden_dims": [24],
+    "num_actions": 4,
+
     "actor_step_size": 1e-4,
     "critic_step_size": 1e-2,
     "batch_size": 128,

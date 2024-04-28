@@ -254,8 +254,8 @@ class CustomEnvironment(ParallelEnv):
             action = actions[id]
             
             #YAAD SE APPLY WORLD LIMIT
-            move_x = np.cos(np.deg2rad((action/self.num_actions)*360))
-            move_y = np.sin(np.deg2rad((action/self.num_actions)*360))
+            move_x = round(np.cos(np.deg2rad((action/self.num_actions)*360)))
+            move_y = round(np.sin(np.deg2rad((action/self.num_actions)*360)))
             move_x = agent.movement_speed * move_x
             move_y = agent.movement_speed * move_y
 
@@ -395,10 +395,10 @@ class CustomEnvironment(ParallelEnv):
 
         points = set() # creating a set for different pellets
 
-        while len(points) < 10*self.num_pellets: # need 10 times necessary possible positions for the pellets for k-means++ sampling
-            point_x = np.random.rand(1) * self.grid_size_x
-            point_y = np.random.rand(1) * self.grid_size_y
-            points.add((point_x[0],point_y[0]))
+        while len(points) < min(10*self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
+            point_x = np.random.randint(1, self.grid_size_x - 1) 
+            point_y = np.random.randint(1, self.grid_size_y - 1) 
+            points.add((point_x,point_y))
         
         points = [list(point) for point in points]
         points = np.array(points)
@@ -442,7 +442,7 @@ class CustomEnvironment(ParallelEnv):
 
         #entity with the pellet's vision and hitting the agent
         # if(abs(dist_x) <= 1 and abs(dist_y) <= 1):
-        if(dist <= 1):
+        if(dist <= 0.25):
             return True
         
         return False
@@ -454,19 +454,19 @@ class CustomEnvironment(ParallelEnv):
 
     #observation space generation given an agent
     def make_observation_space(self, agent):
-        temp = Box(low = -1, high = -1, shape=(3, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.float32)
+        temp = Box(low = -1, high = -1, shape=(2, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.float32)
         box = temp.sample()
-        agent_pos = {}
+        # agent_pos = {}
         pellet_pos = []
 
-        for id,temp_agent in self.agents_objects.items():
-            if(id != agent.id):
-                agent_pos[id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
+        # for id,temp_agent in self.agents_objects.items():
+        #     if(id != agent.id):
+        #         agent_pos[id] = [math.floor(temp_agent.pos_x), math.floor(temp_agent.pos_y), temp_agent.strength]
 
-        for pellet_id,temp_pellet in self.pellets.items():
+        for pellet_id, temp_pellet in self.pellets.items():
             pellet_pos.append([math.floor(temp_pellet.pos_x), math.floor(temp_pellet.pos_y)])
 
-        min_pellet_dist = self.max_vision_size * math.sqrt(2)
+        min_pellet_dist = agent.vision_size * math.sqrt(2)
         # using val to fix for the odd or even vision size
         for i in range(-agent.vision_size, agent.vision_size + 1 ):
             for j in range(-agent.vision_size, agent.vision_size + 1):
@@ -478,24 +478,24 @@ class CustomEnvironment(ParallelEnv):
                 #initiate nothing is of interest in these
                 box[0, self.max_vision_size+j, self.max_vision_size+i] = 0
                 box[1, self.max_vision_size+j, self.max_vision_size+i] = 0
-                box[2, self.max_vision_size+j, self.max_vision_size+i] = 0
+                # box[2, self.max_vision_size+j, self.max_vision_size+i] = 0
                  
-                for tup in agent_pos.items():
-                    id,pos = tup
-                    pos = pos[:-1]
-                    # if inside the vision size, then set the strength of the other agent as the value 
-                    if [x,y] == pos:
-                        box[0, self.max_vision_size+j, self.max_vision_size+i] = self.agents_objects[id].strength
+                # for tup in agent_pos.items():
+                #     id,pos = tup
+                #     pos = pos[:-1]
+                #     # if inside the vision size, then set the strength of the other agent as the value 
+                #     if [x,y] == pos:
+                #         box[0, self.max_vision_size+j, self.max_vision_size+i] = self.agents_objects[id].strength
 
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
                     dist = math.sqrt((x - agent.pos_x)**2 + (y - agent.pos_y)**2)
                     min_pellet_dist = min(min_pellet_dist, dist)
-                    box[1, self.max_vision_size+j, self.max_vision_size+i] = 1
+                    box[0, self.max_vision_size+j, self.max_vision_size+i] = 1
 
                 #inside the vision size but outside the grid
                 if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
-                    box[2, self.max_vision_size+j, self.max_vision_size+i] = 1
+                    box[1, self.max_vision_size+j, self.max_vision_size+i] = 1
 
         return box, min_pellet_dist
 
@@ -538,7 +538,7 @@ class CustomEnvironment(ParallelEnv):
 
                 for row in range(grid_size):
                     for col in range(grid_size):
-                        cell_value = int(observations[id][0][1][row][col])
+                        cell_value = int(observations[id][0][0][row][col])
                         x = top_left_x + col * cell_dims
                         y = top_left_y + row * cell_dims
                         if(cell_value == 0):
