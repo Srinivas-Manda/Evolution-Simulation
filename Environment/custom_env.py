@@ -133,7 +133,7 @@ class CustomEnvironment(ParallelEnv):
             a.movement_speed = env_config["default_movement_speed"]
 
         #initial number of pellets and agent's starting stamina  
-        self.max_episode_size = 500
+        self.max_episode_size = env_config["max_episode_size"]
         self.num_pellets = env_config["num_pellets"]
         self.agents_starting_stamina = env_config['stamina']
 

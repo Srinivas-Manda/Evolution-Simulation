@@ -280,7 +280,7 @@ if __name__ == '__main__':
         "out_channels": 32,
         "hidden_channels": [8, 16],
         "hidden_dims": [32],
-        "num_actions": 360,
+        "num_actions": 4,
         "policy_step_size": 1e-3,
         "batch_size": 2,
         "discount_factor": 0.9,
@@ -304,6 +304,7 @@ if __name__ == '__main__':
     for i in tqdm(range(20)):
         # will be taken by agent
         action, log_prob = ddqn_agent.select_action(state=state)
+        # print(action.shape)
         
         # will be available from the environment
         next_state = (torch.ones_like(state[0]), 1, 50, 50)

@@ -3,6 +3,7 @@
  "agents" : ["DDQN","AC","SAC"],
  "num_agents" : 3,
  "num_actions" : 4,
+ "max_episode_size": 490,
  
  "default_vision" : 8,
  "default_movement_speed" : 1,
