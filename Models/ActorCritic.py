@@ -87,6 +87,8 @@ class ActorCritic(RLAgent):
         '''
         super().__init__(config)
         
+        config['device'] = self.device
+        
         self.actor = Actor(config).to(self.device)
         self.critic = Critic(config).to(self.device)
         

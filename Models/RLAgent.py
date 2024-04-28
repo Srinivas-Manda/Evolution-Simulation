@@ -29,7 +29,11 @@ class RLAgent:
         self.batch_size = config["batch_size"]
         self.discount_factor = config["discount_factor"]
         self.num_actions = config['num_actions']
-        self.device = config['device']
+        
+        if config['device'] is 'cuda':
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = torch.device('cpu')
         
         if not "grad_clip" in config:
             self.grad_clip = None

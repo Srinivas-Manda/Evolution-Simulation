@@ -49,6 +49,7 @@ class DoubleDQN(RLAgent):
     def __init__(self, config):
         super().__init__(config=config)
         
+        config['device'] = self.device
         # initialise the networks
         self.policy_net = QNetwork(config=config).to(self.device)
         self.target_net = QNetwork(config=config).to(self.device)
