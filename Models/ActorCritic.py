@@ -89,7 +89,7 @@ class Actor(nn.Module):
         # x = x.to(self.device)
         # y = y.to(self.device)
 
-        stam_embed = self.stamina_embedding(stam)
+        # stam_embed = self.stamina_embedding(stam)
         x_embed = self.x_pos_embedding(x)
         y_embed = self.y_pox_embedding(y)
         
@@ -105,11 +105,12 @@ class Actor(nn.Module):
         
         # print(x.shape)
         # print(stam.shape)
-        feats = stam_embed + x_embed + y_embed
+        feats = x_embed + y_embed
+        # feats = stam_embed + x_embed + y_embed
         
         outs = self.mlp_block(feats)
         
-        return F.softmax(outs, dim=-1)
+        return outs
     
 # Value Network / Critic
 class Critic(nn.Module):

@@ -94,7 +94,7 @@ class QNetwork(nn.Module):
         # y = y.to(self.device)
 
         # try:
-        stam_embed = self.stamina_embedding(stam)
+        # stam_embed = self.stamina_embedding(stam)
         x_embed = self.x_pos_embedding(x)
         y_embed = self.y_pox_embedding(y)
         # except IndexError:
@@ -110,7 +110,8 @@ class QNetwork(nn.Module):
         
         # print(x.shape)
         # print(stam.shape)
-        feats = stam_embed + x_embed + y_embed
+        feats = x_embed + y_embed
+        # feats = stam_embed + x_embed + y_embed
         
         outs = self.mlp_block(feats)
         

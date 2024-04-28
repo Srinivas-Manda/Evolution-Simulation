@@ -379,6 +379,7 @@ class CustomEnvironment(ParallelEnv):
         # pos_x = np.random.choice(a = list(range(self.grid_size_x)), size = len(self.agents_objects), replace= False) # then to pick an x value for all agents
         # pos_y = np.random.choice(a = list(range(self.grid_size_y)), size = len(self.agents_objects), replace= False) # then to pick an y value for all agents
 
+        np.random.seed(42)
         for i,id in enumerate(self.agents_objects): # iterating over all agents
             # self.agent
             x = np.random.randint(low=self.grid_size_x//10, high=9*(self.grid_size_x//10))
@@ -395,7 +396,9 @@ class CustomEnvironment(ParallelEnv):
 
         points = set() # creating a set for different pellets
 
-        while len(points) < min(10*self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
+        np.random.seed(420)
+        while len(points) < min(self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
+        # while len(points) < min(10*self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
             point_x = np.random.randint(1, self.grid_size_x - 1) 
             point_y = np.random.randint(1, self.grid_size_y - 1) 
             points.add((point_x,point_y))

@@ -68,7 +68,7 @@ class RLAgent:
     def param_step(self, optim, network, loss, retain_graph=False):
         optim.zero_grad()
         loss.backward(retain_graph=retain_graph)
-        if self.grad_clip is not None:
+        if self.grad_clip is not None and network is not None:
             for p in network.modules():
                 torch.nn.utils.clip_grad_norm_(p.parameters(), self.grad_clip)
         optim.step()

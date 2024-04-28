@@ -5,14 +5,19 @@
     "hidden_dims": [24],
     "num_actions": 4,
 
-    "actor_step_size": 1e-4,
-    "critic_step_size": 1e-2,
-    "batch_size": 128,
+    "actor_step_size": 1e-6,
+    "critic_step_size": 1e-4,
+    "batch_size": 1024,
     "discount_factor": 0.75,
-    "capacity": 500,
+    "capacity": 1000000,
     "device": "cuda",
     "log_std_min": -2,
     "log_std_max": 20,
     "epsilon": 1e-8,
-    "tau": 1e-2
+    "tau": 1e-2,
+
+    "grad_clip": 100,
+    "max_stamina": 500,
+    "max_x": 75,
+    "max_y": 75
 }

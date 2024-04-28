@@ -1,7 +1,7 @@
 {
  "num_pellets" : 75,
- "agents" : ["DDQN", "AC"],
- "num_agents" : 2,
+ "agents" : ["DDQN", "AC", "SAC"],
+ "num_agents" : 3,
  "num_actions" : 4,
  "max_episode_size": 490,
  
