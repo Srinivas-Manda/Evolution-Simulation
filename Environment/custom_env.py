@@ -349,7 +349,7 @@ class CustomEnvironment(ParallelEnv):
                     if(a == agent.id):
                         self.agents.remove(a)
                 
-            observations[id] = (observations[id], self.agents_starting_stamina - self.timestep - 1, math.floor(agent.pos_x), math.floor(agent.pos_y))
+            observations[id] = (observations[id], max(self.agents_starting_stamina - self.timestep - 1, 0), math.floor(agent.pos_x), math.floor(agent.pos_y))
 
         #update observation
         # observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
