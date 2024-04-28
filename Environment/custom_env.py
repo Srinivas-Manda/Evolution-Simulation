@@ -307,15 +307,15 @@ class CustomEnvironment(ParallelEnv):
             
             if offlimits:
                 agent.stamina -= self.move_stamina_loss
-                agent.reward -= 3 * self.move_penalty
-                rewards[id] = -3 * self.move_penalty
+                agent.reward -= 10 * self.move_penalty
+                rewards[id] = -10 * self.move_penalty
             
             elif(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
                 # agent.reward -= self.move_penalty
-                agent.reward += float(1 - min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                agent.reward += float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
                 # rewards[id] = -1*self.move_penalty
-                rewards[id] = float(1 - min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
+                rewards[id] = float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) * self.move_penalty
 
             else:
                 agent.stamina += self.pellet_stamina_gain

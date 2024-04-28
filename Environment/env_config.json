@@ -7,7 +7,7 @@
  "default_vision" : 8,
  "default_movement_speed" : 1,
  "default_strength" : 1,
- "stamina" : 100,
+ "stamina" : 30,
  "max_vision" : 8,
  "max_movement_speed" : 1,
  "max_strength" : 20,
@@ -21,6 +21,6 @@
 
  "move_penalty" : 1,
  "pellet_stamina_gain" : 20,
- "pellet_collect_reward": 55,
+ "pellet_collect_reward": 60,
  "move_stamina_loss" : 1
 }
