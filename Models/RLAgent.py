@@ -30,7 +30,7 @@ class RLAgent:
         self.discount_factor = config["discount_factor"]
         self.num_actions = config['num_actions']
         
-        if config['device'] is 'cuda':
+        if config['device'] == 'cuda':
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = torch.device('cpu')
