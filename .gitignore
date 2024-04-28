@@ -1,3 +1,4 @@
 Environment/__pycache__/
 Models/__pycache__/
-Models/ReplayBuffer/__pycache__
+Models/ReplayBuffer/__pycache__/
+SavedWeights/
