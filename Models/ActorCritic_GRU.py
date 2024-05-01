@@ -8,7 +8,6 @@ from torch.distributions import Categorical
 from tqdm import tqdm
 import numpy as np
 from collections import deque
-import time
 
 # from BasicNetworks.RLAgent import RLAgent
 # from BasicNetworks.BasicNetworks import create_convolutional_network, create_linear_network
@@ -287,10 +286,8 @@ class ActorCritic(RLAgent):
             - non_final_mask - torch.tensor: tensor of the same size as the next_states which tells if the next state is terminal or not
         '''
         
-        curr_time = time.time()
         batch = self.replay_buffer.sample(self.batch_size, experience=False)
-        print(time.time() - curr_time)        
-
+        
         # when buffer is not filled enough
         if batch is None:
             return
@@ -326,17 +323,14 @@ class ActorCritic(RLAgent):
         # print(batch['log_probabilities'].unsqueeze(1).shape)
         
         
-        curr_time = time.time()
+        
         self.param_step(optim=self.actor_optimiser, network=self.actor, loss=actor_loss, retain_graph=True)
-        print(time.time() - curr_time)
-
+        
         # calculate critic loss and update critic weight
         critic_loss = F.mse_loss(state_values, batch["rewards"] + torch.logical_not(done).reshape(-1, 1) * self.discount_factor * next_state_values.detach())
         
-        curr_time = time.time()
         self.param_step(optim=self.critic_optimiser, network=self.critic, loss=critic_loss)
-        print(time.time() - curr_time)        
-
+        
         return actor_loss.detach().cpu()
         
 if __name__ == "__main__":
@@ -351,24 +345,20 @@ if __name__ == "__main__":
         "batch_size": 1,
         "discount_factor": 0.9,
         "capacity": 1,
-        "device": 'cpu',
-        "grad_clip": 100000,
-        "max_stamina": 500,
-        "max_x": 40,
-        "max_y": 40
+        "device": 'cpu'
     }
     
     ac_agent = ActorCritic(config=config)
 
     # will be available from previous step/initialisation
-    state = (torch.ones((3, 10, 10)), 1, 1, 1)
+    state = torch.ones((3, 10, 10))
     
     for i in tqdm(range(60)):
         # will be taken by agent
         action, log_prob = ac_agent.select_action(state=state)
         
         # will be available from the environment
-        next_state = (torch.ones_like(state[0]), 1, 1, 1)
+        next_state = torch.ones_like(state)
         reward = 1
         done = False if np.random.rand(1)[0] <= 0.95 else True
         
@@ -379,8 +369,7 @@ if __name__ == "__main__":
         state = next_state
         
         if done:
-            # break
-            pass
+            break
     
     
         

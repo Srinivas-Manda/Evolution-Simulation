@@ -53,7 +53,8 @@ class ReplayBuffer:
             return None
         # first create a probability distribution using the loss memory. None in the case when experience is False
         if experience:
-            probs = torch.nn.functional.softmax(torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze(), dim=-1).detach()
+            probs = torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze()/torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze().sum()
+            # probs = torch.nn.functional.softmax(torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze(), dim=-1).detach()
             # probs = torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze() / torch.sum(torch.tensor(self.loss_memory, dtype=torch.float64, requires_grad=False).squeeze())
             # print(torch.max(probs))
             # print(torch.min(probs))
@@ -62,7 +63,7 @@ class ReplayBuffer:
             # print((probs == 0).sum())
             # print(probs.shape)
         else:
-            probs = torch.ones(len(self.loss_memory))/len(self.loss_memory)
+            probs = None
             
         # then usng this probability, sample the indices from the transition memory
         # rng = np.random.default_rng()

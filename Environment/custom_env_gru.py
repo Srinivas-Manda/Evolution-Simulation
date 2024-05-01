@@ -24,7 +24,7 @@ GRAPE = (161, 255, 138)
 GRAY = (200, 200, 200)
 DARKGREEN = ( 52, 141, 30, 20 )
 AGENT_COLORS = [RED, BLUE, PINK]
-CELL_COLORS = [PEACH, DARKGREEN]
+CELL_COLORS = [PEACH, DARKGREEN, DARKGREEN]
 
 ac_config = open('Environment/ac_config.json')
 ac_variables = json.load(ac_config)
@@ -158,7 +158,10 @@ class CustomEnvironment(ParallelEnv):
         self.move_penalty = env_config['move_penalty']
         self.move_stamina_loss = env_config['move_stamina_loss']
         self.max_vision_size = env_config['max_vision']
-        print(self.move_penalty)
+        # print(self.move_penalty)
+
+        self.offlimits = False
+        self.greedy_inference = False
         # self.reset()
 
     def reset(self, seed=None, options=None):
@@ -194,10 +197,11 @@ class CustomEnvironment(ParallelEnv):
         #     print(a.stamina)
 
         self.timestep = 0
+        self.greedy_inference = False
 
         #get the observation space of all of the agents using the make_observation_space function
         self.observation_spaces = {
-          id : (self.make_observation_space(a)[0], self.agents_starting_stamina - 1, math.floor(self.agents_objects[id].pos_x), math.floor(self.agents_objects[id].pos_y)) for id,a in self.agents_objects.items()
+          id : self.make_observation_space(a)[0] for id,a in self.agents_objects.items()
         }
         
         #havent thought up of necessary infos
@@ -205,7 +209,7 @@ class CustomEnvironment(ParallelEnv):
             id : {} for id,a in self.agents_objects.items()
         }
 
-        if(self.render_mode == "human"):
+        if self.render_mode == "human" or self.render_mode == "greedy_inference":
             pygame.init()
             self.font = pygame.font.Font(None, 32)
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
@@ -265,22 +269,23 @@ class CustomEnvironment(ParallelEnv):
             #apply world limits here
             
             # X limits
-            offlimits = False
+            # self.offlimits = False
+            self.offlimits = False
             if(agent.pos_x < 0):
                 agent.pos_x = 0
-                offlimits = True
+                self.offlimits = True
             elif(agent.pos_x >= self.grid_size_x):
                 agent.pos_x = self.grid_size_x-1
-                offlimits = True
+                self.offlimits = True
 
             # Y limits
             if(agent.pos_y < 0):
                 agent.pos_y = 0
-                offlimits = True
+                self.offlimits = True
 
             elif(agent.pos_y >= self.grid_size_y):
                 agent.pos_y = self.grid_size_y-1
-                offlimits = True
+                self.offlimits = True
             
                 
             #update observation of agent after moving it and before terminating it
@@ -310,14 +315,15 @@ class CustomEnvironment(ParallelEnv):
             #         break
             stamina_reward = math.exp(float((self.max_episode_size - self.timestep)/self.max_episode_size)) * self.move_penalty * 100
             
-            if offlimits:
+            if self.offlimits:
                 agent.stamina -= self.move_stamina_loss
                 # if agent.stamina == 0:
                 #     agent.reward = -stamina_reward + agent.discount_factor * agent.reward
                 #     rewards[id] -=stamina_reward
-                # agent.reward = -10 * self.move_penalty + agent.discount_factor * agent.reward
-                # rewards[id] -= 10 * self.move_penalty
+                # agent.reward = - 100 * self.move_penalty + agent.discount_factor * agent.reward
+                # rewards[id] -= 100 * self.move_penalty
                 # agent.reward = 0
+
             
             elif(flagPelletConsumed == False):
                 agent.stamina -= self.move_stamina_loss
@@ -325,11 +331,12 @@ class CustomEnvironment(ParallelEnv):
                 #     agent.reward = -stamina_reward + agent.discount_factor * agent.reward
                 #     rewards[id] -=stamina_reward
                 # else:
-                # agent.reward -= self.move_penalty
-                # agent.reward = -1*math.exp(float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))) * 2 * self.move_penalty + agent.discount_factor * agent.reward
+                # agent.reward = -1*self.move_penalty + agent.discount_factor * agent.reward
+                # agent.reward = (math.exp(float(1 - min_pellet_dist/(self.max_vision_size * math.sqrt(2)))) - 1) * math.exp(1) * self.move_penalty + agent.discount_factor * agent.reward
                 # rewards[id] = -1*self.move_penalty
-                rewards[id] += math.exp(1 - float(min_pellet_dist/(self.max_vision_size * math.sqrt(2))) - 1) * math.exp(1) * self.move_penalty
+                rewards[id] -= (math.exp(float(min_pellet_dist/(self.max_vision_size * math.sqrt(2)))) - 1) * math.exp(1) * self.move_penalty
                 # agent.reward = 0
+                # rewards[id] -= 0
 
             else:
                 # print(f"Agent {id} consumed pellet")
@@ -337,7 +344,7 @@ class CustomEnvironment(ParallelEnv):
                 # agent.reward = self.pellet_collect_reward + agent.discount_factor * agent.reward
                 rewards[id] += self.pellet_collect_reward
 
-            agent.reward = agent.discount_factor*agent.reward + rewards[id]            
+            agent.reward = agent.discount_factor*agent.reward + rewards[id]
 
             #set termination of agent who's stamina is 0
             if(agent.stamina == 0):
@@ -353,7 +360,7 @@ class CustomEnvironment(ParallelEnv):
                     if(a == agent.id):
                         self.agents.remove(a)
                 
-            observations[id] = (observations[id], max(self.agents_starting_stamina - self.timestep - 1, 0), math.floor(agent.pos_x), math.floor(agent.pos_y))
+            # observations[id] = (observations[id], max(self.agents_starting_stamina - self.timestep - 1, 0), math.floor(agent.pos_x), math.floor(agent.pos_y))
 
         #update observation
         # observations = {a.id : self.make_observation_space(a) for a in self.agents_objects}
@@ -362,7 +369,7 @@ class CustomEnvironment(ParallelEnv):
         
         to_delete = []
         # Check truncation conditions (overwrites termination conditions)
-        if(self.timestep) > self.max_episode_size:
+        if(self.timestep) >= self.max_episode_size:
             rewards = {id : 0 for id, a in self.agents_objects.items()}
             truncations = {id : True for id,a in self.agents_objects.items()}
             self.agents_objects = []
@@ -370,7 +377,12 @@ class CustomEnvironment(ParallelEnv):
             self.pellets = {}
         self.timestep += 1
 
-        if(self.render_mode == "human"):
+        if self.render_mode == 'greedy_inference':
+            # self.greedy_inference = True
+            self.render(observations)
+
+        elif(self.render_mode == "human"):
+            self.greedy_inference = False
             self.render(observations)
         
         return observations, rewards, terminations, truncations, infos
@@ -401,7 +413,7 @@ class CustomEnvironment(ParallelEnv):
         points = set() # creating a set for different pellets
 
         # np.random.seed(420)
-        while len(points) < min(self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
+        while len(points) < min(10*self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
         # while len(points) < min(10*self.num_pellets, self.grid_size_x * self.grid_size_y): # need 10 times necessary possible positions for the pellets for k-means++ sampling
             point_x = np.random.randint(1, self.grid_size_x - 1) 
             point_y = np.random.randint(1, self.grid_size_y - 1) 
@@ -461,7 +473,7 @@ class CustomEnvironment(ParallelEnv):
 
     #observation space generation given an agent
     def make_observation_space(self, agent):
-        temp = Box(low = -1, high = -1, shape=(2, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.float32)
+        temp = Box(low = 1, high = 1, shape=(1, self.max_vision_size*2+1, self.max_vision_size*2+1), dtype=np.float32)
         box = temp.sample()
         # agent_pos = {}
         pellet_pos = []
@@ -477,7 +489,8 @@ class CustomEnvironment(ParallelEnv):
         # using val to fix for the odd or even vision size
         closest_x = -69
         closest_y = -69
-        for i in range(-agent.vision_size, agent.vision_size + 1):
+
+        for i in range(-agent.vision_size, agent.vision_size + 1 ):
             for j in range(-agent.vision_size, agent.vision_size + 1):
 
                 #recheck these two
@@ -486,7 +499,7 @@ class CustomEnvironment(ParallelEnv):
                 
                 #initiate nothing is of interest in these
                 box[0, self.max_vision_size+j, self.max_vision_size+i] = 0
-                box[1, self.max_vision_size+j, self.max_vision_size+i] = 0
+                # box[1, self.max_vision_size+j, self.max_vision_size+i] = 0
                 # box[2, self.max_vision_size+j, self.max_vision_size+i] = 0
                  
                 # for tup in agent_pos.items():
@@ -499,24 +512,22 @@ class CustomEnvironment(ParallelEnv):
                 #inside the vision size and grid and is a pellet 
                 if [x,y] in pellet_pos:
                     dist = math.sqrt((x - agent.pos_x)**2 + (y - agent.pos_y)**2)
-                    # min_pellet_dist = min(min_pellet_dist, dist)
                     if dist < min_pellet_dist:
                         min_pellet_dist = dist
                         closest_x = self.max_vision_size + j
                         closest_y = self.max_vision_size + i
-                    # box[0, self.max_vision_size+j, self.max_vision_size+i] = 1
+                    
 
                 #inside the vision size but outside the grid
                 if  x < 0 or x >= self.grid_size_x or y < 0 or y >= self.grid_size_y:
-                    box[1, self.max_vision_size+j, self.max_vision_size+i] = 1
-                    
+                    box[0, self.max_vision_size+j, self.max_vision_size+i] = 2
                     
         if(closest_x==-69 and closest_y == -69):
             # print("no pellet in view")
             pass
         else:
             box[0,closest_x, closest_y] = 1
-
+            
         return box, min_pellet_dist
 
     def render(self, observations):
@@ -530,11 +541,6 @@ class CustomEnvironment(ParallelEnv):
             for pellet_id,pellet in self.pellets.items():
                 pellet_pos[i] = [pellet.pos_x, pellet.pos_y]
                 i += 1
-
-            # Draw the player circle (relative to coordinate space position)
-            for id,agent in self.agents_objects.items():
-                screen_pos = [agent.pos_x * (self.screen_width / self.grid_size_x), agent.pos_y * (self.screen_height / self.grid_size_y)]
-                pygame.draw.circle(self.screen, AGENT_COLORS[id], screen_pos, 5)
 
             # Draw grid around the circles for their observation space
             cell_dims = 1
@@ -558,15 +564,20 @@ class CustomEnvironment(ParallelEnv):
 
                 for row in range(grid_size):
                     for col in range(grid_size):
-                        cell_value = int(observations[id][0][0][row][col])
+                        cell_value = int(observations[id][0][row][col])
                         x = top_left_x + col * cell_dims
                         y = top_left_y + row * cell_dims
-                        if(cell_value == 0):
+                        if(cell_value != 1):
                             continue
                         scaled_cell_dims = cell_dims * (self.screen_height / self.grid_size_y)
                         screen_x = x * (self.screen_width / self.grid_size_x)
                         screen_y = y * (self.screen_height / self.grid_size_y)
                         pygame.draw.rect(self.screen, CELL_COLORS[cell_value], (screen_x, screen_y, scaled_cell_dims, scaled_cell_dims))
+
+            # Draw the player circle (relative to coordinate space position)
+            for id,agent in self.agents_objects.items():
+                screen_pos = [agent.pos_x * (self.screen_width / self.grid_size_x), agent.pos_y * (self.screen_height / self.grid_size_y)]
+                pygame.draw.circle(self.screen, AGENT_COLORS[id], screen_pos, 5)
 
             # Draw the food circles (relative to coordinate space position)
             for pos in pellet_pos:
@@ -577,17 +588,25 @@ class CustomEnvironment(ParallelEnv):
 
         text_surface = self.font.render(str(self.timestep), True, BLACK)  # White text
         self.screen.blit(text_surface, (0, 0))
+
+        if self.offlimits:
+            text_surface = self.font.render(str(self.offlimits), True, BLACK)  # White text
+            self.screen.blit(text_surface, (0, (self.screen_height*97)//100))
         pygame.display.flip()
 
-        # sleep(1)
+        if self.greedy_inference:
+            sleep(0.1)
+
+        # sleep(0.5)
 
     # Observation space should be defined here.
     def observation_space(self, id):
         return self.observation_spaces[id]
 
     # Action space should be defined here.
+    @functools.lru_cache(maxsize=None)
     def action_space(self, id):
-        return Discrete(360)
+        return Discrete(self.num_actions)
         
     # closes the rendering window
     def close(self):

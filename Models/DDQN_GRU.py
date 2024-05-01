@@ -15,10 +15,10 @@ from collections import deque
 # from BasicNetworks.BasicNetworks import create_convolutional_network, create_linear_network
 
 if __name__ == '__main__':
-    from RLAgent import RLAgent
+    from RLAgent_GRU import RLAgent
     from BasicNetworks import create_convolutional_network, create_linear_network
 else:
-    from Models.RLAgent import RLAgent
+    from Models.RLAgent_GRU import RLAgent
     from Models.BasicNetworks import create_convolutional_network, create_linear_network
     
 # QNetwork
@@ -33,6 +33,8 @@ class QNetwork(nn.Module):
 
         self.device = config['device']
         
+        # for now set to False
+        self.flatten = False
         if self.flatten:
             hidden_dims = []
 
@@ -49,8 +51,10 @@ class QNetwork(nn.Module):
             self.stamina_embedding = nn.Embedding(num_embeddings=config['max_stamina'], embedding_dim=config['out_channels'])
             self.x_pos_embedding = nn.Embedding(num_embeddings=config['max_x'], embedding_dim=config['out_channels'])
             self.y_pox_embedding = nn.Embedding(num_embeddings=config['max_y'], embedding_dim=config['out_channels'])
+        
         else:
             self.feature_extractor = create_convolutional_network(input_channels=config['in_channels'], output_channels=config['out_channels'], hidden_channels=config['hidden_channels'])
+            self.gru = nn.GRU(input_size=config['out_channels'], hidden_size=config['out_channels'])
             self.mlp_block = create_linear_network(input_dim=config['out_channels'], output_dim=config['num_actions'], hidden_dims=config['hidden_dims'])
             self.stamina_embedding = nn.Embedding(num_embeddings=config['max_stamina'], embedding_dim=config['out_channels'])
             self.x_pos_embedding = nn.Embedding(num_embeddings=config['max_x'], embedding_dim=config['out_channels'])
@@ -58,11 +62,20 @@ class QNetwork(nn.Module):
         
         
     def forward(self, state):
-        obs, stam, x, y = state
+        # obs, stam, x, y = state
+
+        # for GRU change
+        obs, hidden = state
+
         if len(obs.shape) == 3:
             obs = obs.unsqueeze(0)
-
         obs = obs.to(self.device)
+        
+        if len(hidden.shape) == 1:
+            hidden = hidden.unsqueeze(0)
+        # if len(hidden.shape) == 2:
+        #     hidden = hidden.unsqueeze(0)
+        hidden = hidden.to(self.device)
 
         if self.flatten:
             # print(obs.shape)
@@ -83,23 +96,23 @@ class QNetwork(nn.Module):
                 
         #     i = i.to(self.device)
             
-        if type(stam) is not torch.Tensor:
-            stam = torch.tensor([stam],  dtype=torch.int).unsqueeze(0)
+        # if type(stam) is not torch.Tensor:
+        #     stam = torch.tensor([stam],  dtype=torch.int).unsqueeze(0)
         # if len(stam.shape) == 1:
         #     stam = stam.unsqueeze(0)
-        stam = stam.to(self.device)
+        # stam = stam.to(self.device)
                 
-        if type(x) is not torch.Tensor:
-            x = torch.tensor([x],  dtype=torch.int).unsqueeze(0)
+        # if type(x) is not torch.Tensor:
+        #     x = torch.tensor([x],  dtype=torch.int).unsqueeze(0)
         # if len(x.shape) == 1:
         #     x = x.unsqueeze(0)
-        x = x.to(self.device)
+        # x = x.to(self.device)
         
-        if type(y) is not torch.Tensor:
-            y = torch.tensor([y],  dtype=torch.int).unsqueeze(0)
+        # if type(y) is not torch.Tensor:
+        #     y = torch.tensor([y],  dtype=torch.int).unsqueeze(0)
         # if len(y.shape) == 1:
         #     y = y.unsqueeze(0)
-        y = y.to(self.device)
+        # y = y.to(self.device)
 
         # stam = stam.to(self.device)
         # x = x.to(self.device)
@@ -107,8 +120,8 @@ class QNetwork(nn.Module):
 
         # try:
         # stam_embed = self.stamina_embedding(stam)
-        x_embed = self.x_pos_embedding(x)
-        y_embed = self.y_pox_embedding(y)
+        # x_embed = self.x_pos_embedding(x)
+        # y_embed = self.y_pox_embedding(y)
         # except IndexError:
         
         
@@ -122,12 +135,20 @@ class QNetwork(nn.Module):
         
         # print(x.shape)
         # print(stam.shape)
-        feats = feats + x_embed + y_embed
+        # feats = feats + x_embed + y_embed
         # feats = stam_embed + x_embed + y_embed
+
+        # LSTM Code
+        # print(hidden.shape)
+        feats = feats.unsqueeze(0)
+        hidden = hidden.unsqueeze(0)
+        outs, hidden = self.gru(feats, hidden)
+        # print(hidden.shape)
+        # print()
         
-        outs = self.mlp_block(feats)
+        outs = self.mlp_block(outs.squeeze(0))
         
-        return outs
+        return outs, hidden.squeeze(0)
 
 # Double DQN Class       
 class DoubleDQN(RLAgent):
@@ -137,7 +158,9 @@ class DoubleDQN(RLAgent):
         
         config['device'] = self.device
         # initialise the networks
+        self.current_context = torch.randn(1, config['out_channels'])
         self.policy_net = QNetwork(config=config).to(self.device)
+        # self.current_context_target = torch.zeros(1, config['out_channels'])
         self.target_net = QNetwork(config=config).to(self.device)
         
         # initialise the optimiser
@@ -163,7 +186,7 @@ class DoubleDQN(RLAgent):
             # print("passing next state")
             # print(next_state[0].shape)
             # next_q = F.softmax(network(next_state), dim=-1)
-            next_q = network(next_state)
+            next_q, _ = network(next_state)
             
         if type(done) is bool:
             done = torch.Tensor([done]).to(self.device)
@@ -174,14 +197,15 @@ class DoubleDQN(RLAgent):
         return target_q
     
     # calculate the loss
-    def calc_policy_loss(self, state, action, reward, next_state, done, policy_net, target_net):
-        curr_q = self.calc_current_q_values(state=state, network=policy_net)
+    def calc_policy_loss(self, state, action, reward, next_state, done, policy_net, target_net, curr_q = None):
+        if curr_q is None:
+            curr_q, _ = self.calc_current_q_values(state=state, network=policy_net)
         target_q = self.calc_target_q_value(reward=reward, next_state=next_state, done=done, network=target_net)
         
         if type(action) is not torch.Tensor:
             action = torch.tensor([action], dtype=torch.int).to(self.device)
         
-        loss = F.mse_loss(curr_q[np.arange(curr_q.shape[0]), action.squeeze()], target_q.detach().max(dim=-1)[0])
+        loss = F.mse_loss(curr_q[np.arange(curr_q.shape[0]), action.squeeze()], target_q.max(dim=-1)[0])
 
         # print(f"Curr Q Val: {curr_q}")
         # print(f"All Curr Q Val: {curr_q[np.arange(curr_q.shape[0]), action.squeeze()]}")
@@ -194,16 +218,51 @@ class DoubleDQN(RLAgent):
         # print()
 
         return loss
+    
+    def select_greedy_action(self, state):
+        if type(state) is not torch.Tensor:
+            # state = (torch.tensor(state[0]), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
+            state = torch.tensor(state)
+            
+        # if np.random.rand() > 0.5:
+        #     network = self.policy_net
+        #     # state = (state, self.current_context_policy)
+        # else:
+        #     network = self.target_net
+        #     # state = (state, self.current_context_target)
+        state = (state, self.current_context)
+        network = self.policy_net
+            
+        
+        with torch.no_grad():
+            # if len(state.shape) == 3:
+            #     state = state.unsqueeze(0)
+                
+            # get the probabilities
+            # print("passing state")
+            action_probs = F.softmax(network(state)[0], dim=-1)
+            # print(action_probs.shape)
+            
+            log_probs = torch.log(action_probs)
+            
+        # if action is to be chosen greedily
+        action_probs, action = torch.max(action_probs, dim=-1)
+        
+        return action.item(), torch.log(action_probs)
 
     # gives an action and the corresponding log prob        
     def select_action(self, state):
+        if type(state) is not torch.Tensor:
+            # state = (torch.tensor(state[0]), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
+            state = torch.tensor(state)
+            
         if np.random.rand() > 0.5:
             network = self.policy_net
+            # state = (state, self.current_context_policy)
         else:
             network = self.target_net
-            
-        if type(state[0]) is not torch.Tensor:
-            state = (torch.tensor(state[0]), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
+            # state = (state, self.current_context_target)
+        state = (state, self.current_context)
             
         
         # calculate the threshold
@@ -215,7 +274,7 @@ class DoubleDQN(RLAgent):
                 
             # get the probabilities
             # print("passing state")
-            action_probs = F.softmax(network(state), dim=-1)
+            action_probs = F.softmax(network(state)[0], dim=-1)
             # print(action_probs.shape)
             
             log_probs = torch.log(action_probs)
@@ -224,11 +283,19 @@ class DoubleDQN(RLAgent):
         if np.random.rand() > eps_threshold:
             action_probs, action = torch.max(action_probs, dim=-1)
             
+            if action.item() >= self.num_actions:
+                print(action)
+                print(state)
+
             return action.item(), torch.log(action_probs)
         # if random sampling needs to be done
         else:
             action = np.random.randint(0, self.num_actions)
             # print (action, log_probs)
+            if action > self.num_actions:
+                print(action)
+                print(state)
+
             return action, log_probs[:, action]
         
     def push_to_buffer(self, *args):
@@ -237,12 +304,16 @@ class DoubleDQN(RLAgent):
         state, action, reward, next_state, log_prob, done = args
         
         if type(state[0]) is not torch.Tensor:
-            state = (torch.tensor(state[0]).unsqueeze(0), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
-            next_state = (torch.tensor(next_state[0]).unsqueeze(0), torch.tensor([next_state[1]]), torch.tensor([next_state[2]]), torch.tensor([next_state[3]]))
+            # state = (torch.tensor(state[0]).unsqueeze(0), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
+            # next_state = (torch.tensor(next_state[0]).unsqueeze(0), torch.tensor([next_state[1]]), torch.tensor([next_state[2]]), torch.tensor([next_state[3]]))
+            state = torch.tensor(state).unsqueeze(0)
+            next_state = torch.tensor(next_state).unsqueeze(0)
             
         else:
-            state = (state[0].unsqueeze(0), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
-            next_state = (next_state[0].unsqueeze(0), torch.tensor([next_state[1]]), torch.tensor([next_state[2]]), torch.tensor([next_state[3]]))
+            # state = (state[0].unsqueeze(0), torch.tensor([state[1]]), torch.tensor([state[2]]), torch.tensor([state[3]]))
+            # next_state = (next_state[0].unsqueeze(0), torch.tensor([next_state[1]]), torch.tensor([next_state[2]]), torch.tensor([next_state[3]]))
+            state = state.unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
         # print(state)
         
         state, action, reward, next_state, done = state, torch.tensor([action]).unsqueeze(0), torch.tensor([reward]).unsqueeze(0), next_state, torch.tensor([done]).unsqueeze(0)
@@ -252,14 +323,25 @@ class DoubleDQN(RLAgent):
             # target_q = self.calc_target_q_value(reward=reward, next_state=next_state, done=done)
             
             # loss = F.mse_loss(curr_q[0, action], target_q.max())
-            if np.random.rand() > 0.5:
-                network_1 = self.policy_net
-                network_2 = self.target_net
-            else:
-                network_1 = self.target_net
-                network_2 = self.policy_net
+            # if np.random.rand() > 0.5:
+            #     network_1 = self.policy_net
+            #     network_2 = self.target_net
+            # else:
+            #     network_1 = self.target_net
+            #     network_2 = self.policy_net
+            network_1 = self.policy_net
+            network_2 = self.target_net
 
-            loss = self.calc_policy_loss(state, action.to(self.device), reward.to(self.device), next_state, done.to(self.device), policy_net=network_1, target_net=network_2)
+            hidden_1 = self.current_context
+            state = (state, self.current_context)
+            curr_q, self.current_context = self.calc_current_q_values(state, network_1)
+            state = (state[0], self.current_context.cpu())
+            next_state = (next_state, self.current_context.cpu())
+
+            # print(state)
+            # print(next_state)
+
+            loss = self.calc_policy_loss(state, action.to(self.device), reward.to(self.device), next_state, done.to(self.device), policy_net=network_1, target_net=network_2, curr_q=curr_q)
             
         
         # print(state.shape)
@@ -300,21 +382,24 @@ class DoubleDQN(RLAgent):
         batch['log_probabilities'] = batch['log_probabilities'].to(self.device)
         batch['non_final_mask'] = batch['non_final_mask'].to(self.device)
         
-        if np.random.rand() > 0.5:
-            network_1 = self.policy_net
-            network_2 = self.target_net
-            optim = self.policy_optim
-        else:
-            network_1 = self.target_net
-            network_2 = self.policy_net
-            optim = self.target_optim
+        # if np.random.rand() > 0.5:
+        #     network_1 = self.policy_net
+        #     network_2 = self.target_net
+        #     optim = self.policy_optim
+        # else:
+        #     network_1 = self.target_net
+        #     network_2 = self.policy_net
+        #     optim = self.target_optim
+        network_1 = self.policy_net
+        network_2 = self.target_net
+        optim = self.policy_optim
         
         # calculate policy loss and update policy weights
         policy_loss = self.calc_policy_loss(batch['states'], batch['actions'], batch['rewards'], batch['next_states'], torch.logical_not(batch['non_final_mask']), policy_net=network_1, target_net=network_2)
         self.param_step(optim=optim, network=network_1, loss=policy_loss)
         
-        # # soft updates for the target net
-        # self.soft_update(target=self.target_net, source=self.policy_net)
+        # soft updates for the target net
+        self.soft_update(target=network_2, source=network_1)
         
         # update number of steps done
         self.steps_done += 1
@@ -322,7 +407,7 @@ class DoubleDQN(RLAgent):
         return policy_loss.detach().cpu()
         
 if __name__ == '__main__':
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     config = {
         "in_channels": 3,
         "out_channels": 32,
